@@ -1,6 +1,5 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI
 from src.infrastructure.persistence.database import engine, Base
 from src.infrastructure.config.settings import SERVICE_PORT
 from src.presentation.routes.company_routes import auth_router
@@ -22,16 +21,7 @@ app.include_router(api_key_routes)
 app.include_router(application_routes)
 
 @app.get("/health")
-def health_check(request: Request):
-    client_ip = request.client.host
-    allowed_ips = ["*"]
-    
-    if client_ip not in allowed_ips:
-        return JSONResponse(
-            status_code=403,
-            content={"detail": "No autorizado"}
-        )
-    
+def health_check():
     return {"status": "ok", "service": "auth-service"}
 
 if __name__ == "__main__":

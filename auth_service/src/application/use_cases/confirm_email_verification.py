@@ -1,22 +1,40 @@
 from datetime import datetime
 from src.domain.entities.company import Company
-from src.domain.entities.api_key import ApiKey
 from src.domain.repositories.company_repository import CompanyRepository
 from src.domain.repositories.api_key_repository import ApiKeyRepository
-from src.domain.value_objects.api_key_value import ApiKeyValue
+from src.domain.repositories.email_verification_repository import EmailVerificationRepository
 from src.infrastructure.messaging.rabbitmq_client import RabbitMQClient
 from src.application.dtos.company_dto import CompanyDTO
 
-class RegisterCompanyUseCase:
-    def __init__(self, company_repo: CompanyRepository, api_key_repo: ApiKeyRepository, rabbitmq_client: RabbitMQClient):
+class ConfirmEmailVerificationUseCase:
+    def __init__(self, company_repo: CompanyRepository, api_key_repo: ApiKeyRepository, email_verification_repo: EmailVerificationRepository, rabbitmq_client: RabbitMQClient):
         self.company_repo = company_repo
         self.api_key_repo = api_key_repo
+        self.email_verification_repo = email_verification_repo
         self.rabbitmq_client = rabbitmq_client
 
-    def execute(self, name: str, email: str) -> dict:
+    def execute(self, name: str, email: str, verification_code: str) -> dict:
+        email_verification = self.email_verification_repo.get_by_code(verification_code)
+        
+        if not email_verification:
+            self._publish_log(f"Codigo de verificacion invalido", "error")
+            raise ValueError("Codigo de verificacion invalido")
+
+        if email_verification.email != email:
+            self._publish_log(f"Email no corresponde al codigo", "error")
+            raise ValueError("Email no corresponde al codigo de verificacion")
+
+        if email_verification.is_expired():
+            self._publish_log(f"Codigo de verificacion expirado", "error")
+            raise ValueError("Codigo de verificacion expirado")
+
+        if email_verification.is_used:
+            self._publish_log(f"Codigo ya fue utilizado", "error")
+            raise ValueError("Codigo ya fue utilizado")
+
         existing_company = self.company_repo.get_by_email(email)
         if existing_company:
-            self._publish_log(f"Intento de registro con email duplicado: {email}", "error")
+            self._publish_log(f"Email ya registrado: {email}", "error")
             raise ValueError(f"Email {email} ya esta registrado")
 
         company = Company(
@@ -29,6 +47,9 @@ class RegisterCompanyUseCase:
         )
 
         created_company = self.company_repo.create(company)
+
+        email_verification.mark_as_used()
+        self.email_verification_repo.update(email_verification)
 
         self._publish_log(f"Empresa registrada: {created_company.email}", "info")
         self._send_welcome_email(created_company)

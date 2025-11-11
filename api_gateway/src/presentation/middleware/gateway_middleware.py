@@ -25,14 +25,20 @@ class GatewayMiddleware(BaseHTTPMiddleware):
             '/openapi.json',
             '/redoc',
             '/health/services',
-            '/auth/auth/companies/register',
-            '/auth/auth/api-keys/validate',
-            '/auth/health',
-            '/logs/health',
-            '/logs/logs/'
+            '/auth/companies/request-verification',
+            '/auth/companies/register',
+            '/auth/api-keys/validate'
         ]
         
         if request.url.path in public_paths or any(request.url.path.startswith(p) for p in public_paths):
+            response = await call_next(request)
+            return response
+
+        if request.url.path.startswith('/auth/applications') and request.method == 'POST' and 'company_id' in str(request.url.query):
+            response = await call_next(request)
+            return response
+
+        if request.url.path.startswith('/auth/companies/') and request.method == 'GET':
             response = await call_next(request)
             return response
 

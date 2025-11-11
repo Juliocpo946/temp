@@ -13,12 +13,13 @@ from src.application.use_cases.generate_new_api_key import GenerateNewApiKeyUseC
 from src.application.use_cases.request_revoke_api_key import RequestRevokeApiKeyUseCase
 from src.application.use_cases.confirm_revoke_api_key import ConfirmRevokeApiKeyUseCase
 from src.presentation.schemas.application_schema import ApplicationCreateSchema, ApiKeyResponseSchema, ConfirmRevokeSchema
+import traceback
 
 router = APIRouter()
 rabbitmq_client = RabbitMQClient()
 
-@router.post("/", response_model=dict)
-def create_application(application_data: ApplicationCreateSchema, company_id: str = Query(...), db: Session = Depends(get_db)):
+@router.post("/")
+async def create_application(application_data: ApplicationCreateSchema, company_id: str = Query(...), db: Session = Depends(get_db)):
     try:
         application_repo = ApplicationRepositoryImpl(db)
         company_repo = CompanyRepositoryImpl(db)
@@ -29,22 +30,22 @@ def create_application(application_data: ApplicationCreateSchema, company_id: st
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
-        print(f"Error al crear aplicacion: {str(e)}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error interno del servidor")
+        print(f"Error detallado: {traceback.format_exc()}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
-@router.get("/", response_model=dict)
-def get_applications(company_id: str = Query(...), db: Session = Depends(get_db)):
+@router.get("/")
+async def get_applications(company_id: str = Query(...), db: Session = Depends(get_db)):
     try:
         application_repo = ApplicationRepositoryImpl(db)
         use_case = GetApplicationsUseCase(application_repo, rabbitmq_client)
         result = use_case.execute(company_id)
         return result
     except Exception as e:
-        print(f"Error al obtener aplicaciones: {str(e)}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error interno del servidor")
+        print(f"Error detallado: {traceback.format_exc()}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
-@router.get("/{application_id}", response_model=dict)
-def get_application(application_id: str, db: Session = Depends(get_db)):
+@router.get("/{application_id}")
+async def get_application(application_id: str, db: Session = Depends(get_db)):
     try:
         application_repo = ApplicationRepositoryImpl(db)
         use_case = GetApplicationUseCase(application_repo, rabbitmq_client)
@@ -53,11 +54,11 @@ def get_application(application_id: str, db: Session = Depends(get_db)):
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
-        print(f"Error al obtener aplicacion: {str(e)}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error interno del servidor")
+        print(f"Error detallado: {traceback.format_exc()}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
-@router.post("/{application_id}/generate-key", response_model=ApiKeyResponseSchema)
-def generate_api_key(application_id: str, db: Session = Depends(get_db)):
+@router.post("/{application_id}/generate-key")
+async def generate_api_key(application_id: str, db: Session = Depends(get_db)):
     try:
         application_repo = ApplicationRepositoryImpl(db)
         company_repo = CompanyRepositoryImpl(db)
@@ -68,11 +69,11 @@ def generate_api_key(application_id: str, db: Session = Depends(get_db)):
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
-        print(f"Error al generar API key: {str(e)}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error interno del servidor")
+        print(f"Error detallado: {traceback.format_exc()}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
-@router.post("/api-keys/{api_key_id}/request-revoke", response_model=dict)
-def request_revoke_api_key(api_key_id: str, db: Session = Depends(get_db)):
+@router.post("/api-keys/{api_key_id}/request-revoke")
+async def request_revoke_api_key(api_key_id: str, db: Session = Depends(get_db)):
     try:
         api_key_repo = ApiKeyRepositoryImpl(db)
         application_repo = ApplicationRepositoryImpl(db)
@@ -84,11 +85,11 @@ def request_revoke_api_key(api_key_id: str, db: Session = Depends(get_db)):
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
-        print(f"Error al solicitar revocacion: {str(e)}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error interno del servidor")
+        print(f"Error detallado: {traceback.format_exc()}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
-@router.post("/api-keys/{api_key_id}/confirm-revoke", response_model=dict)
-def confirm_revoke_api_key(api_key_id: str, confirm_data: ConfirmRevokeSchema, db: Session = Depends(get_db)):
+@router.post("/api-keys/{api_key_id}/confirm-revoke")
+async def confirm_revoke_api_key(api_key_id: str, confirm_data: ConfirmRevokeSchema, db: Session = Depends(get_db)):
     try:
         api_key_repo = ApiKeyRepositoryImpl(db)
         application_repo = ApplicationRepositoryImpl(db)
@@ -100,5 +101,5 @@ def confirm_revoke_api_key(api_key_id: str, confirm_data: ConfirmRevokeSchema, d
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
-        print(f"Error al confirmar revocacion: {str(e)}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error interno del servidor")
+        print(f"Error detallado: {traceback.format_exc()}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))

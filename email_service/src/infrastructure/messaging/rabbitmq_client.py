@@ -12,30 +12,53 @@ class RabbitMQClient:
     def connect(self) -> None:
         try:
             parameters = pika.URLParameters(AMQP_URL)
+            parameters.heartbeat = 600
+            parameters.blocked_connection_timeout = 300
             self.connection = pika.BlockingConnection(parameters)
             self.channel = self.connection.channel()
+            print(f"Conectado a RabbitMQ")
         except Exception as e:
             print(f"Error al conectar con RabbitMQ: {str(e)}")
             raise
 
     def declare_queue(self, queue_name: str) -> None:
+        if self.channel is None or self.channel.is_closed:
+            self.connect()
         self.channel.queue_declare(queue=queue_name, durable=True)
 
-    def publish(self, queue_name: str, message: Dict[str, Any]) -> None:
-        try:
-            self.declare_queue(queue_name)
-            self.channel.basic_publish(
-                exchange='',
-                routing_key=queue_name,
-                body=json.dumps(message),
-                properties=pika.BasicProperties(delivery_mode=2)
-            )
-        except Exception as e:
-            print(f"Error al publicar mensaje en RabbitMQ: {str(e)}")
-            raise
+    def publish(self, queue_name: str, message: dict) -> None:
+        max_retries = 3
+        retry_count = 0
+        
+        while retry_count < max_retries:
+            try:
+                if self.connection is None or self.connection.is_closed:
+                    self.connect()
+                
+                self.declare_queue(queue_name)
+                self.channel.basic_publish(
+                    exchange='',
+                    routing_key=queue_name,
+                    body=json.dumps(message),
+                    properties=pika.BasicProperties(delivery_mode=2)
+                )
+                return
+            except Exception as e:
+                retry_count += 1
+                print(f"Error al publicar mensaje en RabbitMQ (intento {retry_count}/{max_retries}): {str(e)}")
+                if retry_count < max_retries:
+                    try:
+                        self.connect()
+                    except:
+                        pass
+                else:
+                    raise
 
     def consume(self, queue_name: str, callback: Callable) -> None:
         try:
+            if self.connection is None or self.connection.is_closed:
+                self.connect()
+                
             self.declare_queue(queue_name)
             self.channel.basic_consume(queue=queue_name, on_message_callback=callback, auto_ack=False)
             print(f"Escuchando en cola: {queue_name}")
@@ -48,5 +71,6 @@ class RabbitMQClient:
         try:
             if self.connection and not self.connection.is_closed:
                 self.connection.close()
+                print(f"Desconectado de RabbitMQ")
         except Exception as e:
             print(f"Error al cerrar conexión RabbitMQ: {str(e)}")

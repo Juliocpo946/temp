@@ -1,5 +1,7 @@
 from typing import Optional
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
+import uuid
 from src.domain.entities.company import Company
 from src.domain.repositories.company_repository import CompanyRepository
 from src.infrastructure.persistence.models.company_model import CompanyModel
@@ -15,11 +17,17 @@ class CompanyRepositoryImpl(CompanyRepository):
             is_active=company.is_active
         )
         self.db.add(db_company)
-        self.db.commit()
-        self.db.refresh(db_company)
-        return self._to_domain(db_company)
+        try:
+            self.db.commit()
+            self.db.refresh(db_company)
+            return self._to_domain(db_company)
+        except IntegrityError:
+            self.db.rollback()
+            raise ValueError(f"Email {company.email} ya esta registrado")
 
     def get_by_id(self, company_id: int) -> Optional[Company]:
+        if isinstance(company_id, str):
+            company_id = uuid.UUID(company_id)
         db_company = self.db.query(CompanyModel).filter(CompanyModel.id == company_id).first()
         return self._to_domain(db_company) if db_company else None
 
@@ -34,12 +42,18 @@ class CompanyRepositoryImpl(CompanyRepository):
             db_company.email = company.email
             db_company.is_active = company.is_active
             db_company.updated_at = company.updated_at
-            self.db.commit()
-            self.db.refresh(db_company)
-            return self._to_domain(db_company)
+            try:
+                self.db.commit()
+                self.db.refresh(db_company)
+                return self._to_domain(db_company)
+            except IntegrityError:
+                self.db.rollback()
+                raise ValueError(f"Email {company.email} ya esta en uso")
         return company
 
     def delete(self, company_id: int) -> bool:
+        if isinstance(company_id, str):
+            company_id = uuid.UUID(company_id)
         db_company = self.db.query(CompanyModel).filter(CompanyModel.id == company_id).first()
         if db_company:
             self.db.delete(db_company)

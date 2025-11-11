@@ -17,8 +17,7 @@ def create_log(log_data: LogCreateSchema):
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
-        print(f"Error al guardar log: {str(e)}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error interno del servidor")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 @router.get("/", response_model=dict)
 def get_logs(
@@ -32,8 +31,7 @@ def get_logs(
         result = use_case.execute(service, level, limit)
         return result
     except Exception as e:
-        print(f"Error al obtener logs: {str(e)}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error interno del servidor")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 @router.get("/{service}", response_model=dict)
 def get_logs_by_service(service: str, limit: int = Query(100, ge=1, le=1000)):
@@ -43,5 +41,4 @@ def get_logs_by_service(service: str, limit: int = Query(100, ge=1, le=1000)):
         result = use_case.execute(service=service, limit=limit)
         return result
     except Exception as e:
-        print(f"Error al obtener logs: {str(e)}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error interno del servidor")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
