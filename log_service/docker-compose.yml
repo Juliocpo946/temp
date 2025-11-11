@@ -1,0 +1,13 @@
+services:
+  log_service:
+    build: .
+    ports:
+      - "3002:3002"
+    env_file:
+      - .env
+    networks:
+      - microservices
+
+networks:
+  microservices:
+    driver: bridge

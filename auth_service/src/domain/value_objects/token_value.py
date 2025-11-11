@@ -1,0 +1,18 @@
+import secrets
+from typing import Optional
+
+class TokenValue:
+    def __init__(self, value: Optional[str] = None):
+        self.value = value or self._generate()
+
+    @staticmethod
+    def _generate() -> str:
+        return secrets.token_urlsafe(32)
+
+    def __str__(self) -> str:
+        return self.value
+
+    def __eq__(self, other) -> bool:
+        if isinstance(other, TokenValue):
+            return self.value == other.value
+        return self.value == other
