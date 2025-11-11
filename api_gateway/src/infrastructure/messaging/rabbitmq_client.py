@@ -1,6 +1,6 @@
 import json
 import pika
-from typing import Dict, Any
+from typing import Dict, Any, Callable
 from src.infrastructure.config.settings import AMQP_URL
 
 class RabbitMQClient:
@@ -33,6 +33,20 @@ class RabbitMQClient:
             )
         except Exception as e:
             print(f"Error al publicar mensaje en RabbitMQ: {str(e)}")
+            raise
+
+    def consume(self, queue_name: str, callback: Callable) -> None:
+        try:
+            self.declare_queue(queue_name)
+            self.channel.basic_consume(
+                queue=queue_name, 
+                on_message_callback=callback, 
+                auto_ack=False
+            )
+            print(f"Escuchando en cola: {queue_name}")
+            self.channel.start_consuming()
+        except Exception as e:
+            print(f"Error al consumir de RabbitMQ: {str(e)}")
             raise
 
     def close(self) -> None:
