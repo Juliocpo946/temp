@@ -4,7 +4,7 @@ from src.infrastructure.persistence.database import get_db
 from src.infrastructure.persistence.repositories.application_repository_impl import ApplicationRepositoryImpl
 from src.infrastructure.persistence.repositories.company_repository_impl import CompanyRepositoryImpl
 from src.infrastructure.persistence.repositories.api_key_repository_impl import ApiKeyRepositoryImpl
-from auth_service.src.infrastructure.persistence.repositories.revocation_api_key_repository_impl import RevocationApiKeyRepositoryImpl
+from src.infrastructure.persistence.repositories.revocation_api_key_repository_impl import RevocationApiKeyRepositoryImpl
 from src.infrastructure.messaging.rabbitmq_client import RabbitMQClient
 from src.application.use_cases.create_application import CreateApplicationUseCase
 from src.application.use_cases.get_applications import GetApplicationsUseCase

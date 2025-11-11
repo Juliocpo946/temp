@@ -1,11 +1,11 @@
-import redis
 import json
 from typing import Optional, Dict, Any
-from src.infrastructure.config.settings import REDIS_URL
+from upstash_redis import Redis
+from src.infrastructure.config.settings import REDIS_URL, REDIS_TOKEN
 
 class RedisClient:
     def __init__(self):
-        self.client = redis.from_url(REDIS_URL, decode_responses=True)
+        self.client = Redis(url=REDIS_URL, token=REDIS_TOKEN)
 
     def get_api_key(self, key_value: str) -> Optional[Dict[str, Any]]:
         try:
@@ -62,4 +62,4 @@ class RedisClient:
             return 0
 
     def close(self):
-        self.client.close()
+        pass
