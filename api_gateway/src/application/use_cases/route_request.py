@@ -7,10 +7,10 @@ class RouteRequestUseCase:
     def __init__(self, rabbitmq_client: RabbitMQClient):
         self.rabbitmq_client = rabbitmq_client
 
-    def execute(self, correlation_id: str, token: str, service: str, method: str, path: str, status: int) -> None:
+    def execute(self, correlation_id: str, api_key: str, service: str, method: str, path: str, status: int) -> None:
         request = Request(
             correlation_id=correlation_id,
-            token=token,
+            api_key=api_key,
             service=service,
             method=method,
             path=path,
@@ -20,7 +20,7 @@ class RouteRequestUseCase:
 
         request_dto = RequestDTO(
             correlation_id=request.correlation_id,
-            token=request.token,
+            api_key=request.api_key,
             service=request.service,
             method=request.method,
             path=request.path,
@@ -28,7 +28,7 @@ class RouteRequestUseCase:
             timestamp=request.timestamp
         )
 
-        self._publish_log(f"Petición ruteada: {method} {path} -> {service} [{status}]", "info")
+        self._publish_log(f"Peticion ruteada: {method} {path} -> {service} [{status}]", "info")
 
     def _publish_log(self, message: str, level: str) -> None:
         log_message = {

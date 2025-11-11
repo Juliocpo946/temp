@@ -1,7 +1,7 @@
 import secrets
 from typing import Optional
 
-class TokenValue:
+class ApiKeyValue:
     def __init__(self, value: Optional[str] = None):
         self.value = value or self._generate()
 
@@ -13,6 +13,6 @@ class TokenValue:
         return self.value
 
     def __eq__(self, other) -> bool:
-        if isinstance(other, TokenValue):
+        if isinstance(other, ApiKeyValue):
             return self.value == other.value
         return self.value == other

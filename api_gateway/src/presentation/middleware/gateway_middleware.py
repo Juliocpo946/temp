@@ -26,7 +26,7 @@ class GatewayMiddleware(BaseHTTPMiddleware):
             '/redoc',
             '/health/services',
             '/auth/auth/companies/register',
-            '/auth/auth/tokens/validate',
+            '/auth/auth/api-keys/validate',
             '/auth/health',
             '/logs/health',
             '/logs/logs/'
@@ -40,30 +40,30 @@ class GatewayMiddleware(BaseHTTPMiddleware):
         if not auth_header.startswith('Bearer '):
             return JSONResponse(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                content={"detail": "Token requerido"}
+                content={"detail": "API key requerida"}
             )
 
-        token = auth_header.split(' ')[1]
+        key_value = auth_header.split(' ')[1]
         
-        cached_data = self.redis_client.get_api_key(token)
+        cached_data = self.redis_client.get_api_key(key_value)
         
         if cached_data:
             if not cached_data.get('is_active'):
                 return JSONResponse(
                     status_code=status.HTTP_401_UNAUTHORIZED,
-                    content={"detail": "Token inactivo"}
+                    content={"detail": "API key inactiva"}
                 )
             
             request.state.company_id = cached_data.get('company_id')
             request.state.application_id = cached_data.get('application_id')
-            request.state.token = token
+            request.state.api_key = key_value
         else:
-            validation_result = await self._validate_with_auth_service(token)
+            validation_result = await self._validate_with_auth_service(key_value)
             
             if not validation_result['valid']:
                 return JSONResponse(
                     status_code=status.HTTP_401_UNAUTHORIZED,
-                    content={"detail": "Token invalido"}
+                    content={"detail": "API key invalida"}
                 )
             
             cache_data = {
@@ -71,11 +71,11 @@ class GatewayMiddleware(BaseHTTPMiddleware):
                 'application_id': validation_result.get('application_id'),
                 'is_active': True
             }
-            self.redis_client.set_api_key(token, cache_data, ttl=3600)
+            self.redis_client.set_api_key(key_value, cache_data, ttl=3600)
             
             request.state.company_id = validation_result['company_id']
             request.state.application_id = validation_result.get('application_id')
-            request.state.token = token
+            request.state.api_key = key_value
 
         if hasattr(request.state, 'application_id') and request.state.application_id:
             today = datetime.utcnow().strftime('%Y-%m-%d')
@@ -85,14 +85,14 @@ class GatewayMiddleware(BaseHTTPMiddleware):
 
         return response
 
-    async def _validate_with_auth_service(self, token: str) -> dict:
+    async def _validate_with_auth_service(self, key_value: str) -> dict:
         try:
-            validation_url = f"{AUTH_SERVICE_URL}/auth/tokens/validate"
+            validation_url = f"{AUTH_SERVICE_URL}/auth/api-keys/validate"
             response = await self.http_client.post(
                 validation_url,
-                json={"token": token}
+                json={"key_value": key_value}
             )
             return response
         except Exception as e:
-            print(f"Error al validar token: {str(e)}")
+            print(f"Error al validar API key: {str(e)}")
             return {'valid': False, 'company_id': None, 'application_id': None}

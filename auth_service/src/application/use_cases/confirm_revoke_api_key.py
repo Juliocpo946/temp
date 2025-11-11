@@ -1,12 +1,12 @@
-from src.domain.repositories.token_repository import TokenRepository
+from src.domain.repositories.api_key_repository import ApiKeyRepository
 from src.domain.repositories.application_repository import ApplicationRepository
 from src.domain.repositories.company_repository import CompanyRepository
 from src.domain.repositories.revocation_token_repository import RevocationTokenRepository
 from src.infrastructure.messaging.rabbitmq_client import RabbitMQClient
 
 class ConfirmRevokeApiKeyUseCase:
-    def __init__(self, token_repo: TokenRepository, application_repo: ApplicationRepository, company_repo: CompanyRepository, revocation_token_repo: RevocationTokenRepository, rabbitmq_client: RabbitMQClient):
-        self.token_repo = token_repo
+    def __init__(self, api_key_repo: ApiKeyRepository, application_repo: ApplicationRepository, company_repo: CompanyRepository, revocation_token_repo: RevocationTokenRepository, rabbitmq_client: RabbitMQClient):
+        self.api_key_repo = api_key_repo
         self.application_repo = application_repo
         self.company_repo = company_repo
         self.revocation_token_repo = revocation_token_repo
@@ -31,20 +31,20 @@ class ConfirmRevokeApiKeyUseCase:
             self._publish_log(f"Codigo ya fue utilizado", "error")
             raise ValueError("Codigo ya fue utilizado")
 
-        token = self.token_repo.get_by_id(api_key_id)
-        if not token:
+        api_key = self.api_key_repo.get_by_id(api_key_id)
+        if not api_key:
             raise ValueError("API key no existe")
 
-        company = self.company_repo.get_by_id(str(token.company_id))
+        company = self.company_repo.get_by_id(str(api_key.company_id))
 
-        token.revoke()
-        self.token_repo.update(token)
+        api_key.revoke()
+        self.api_key_repo.update(api_key)
 
         revocation_token.mark_as_used()
         self.revocation_token_repo.update(revocation_token)
 
-        self._publish_cache_invalidation(token.token)
-        self._send_revocation_email(company, token)
+        self._publish_cache_invalidation(api_key.key_value)
+        self._send_revocation_email(company, api_key)
         self._publish_log(f"API key revocada: {api_key_id}", "info")
 
         return {'success': True, 'message': 'API key revocada exitosamente'}
@@ -55,12 +55,12 @@ class ConfirmRevokeApiKeyUseCase:
             'key': f"apikey:{key_value}"
         })
 
-    def _send_revocation_email(self, company, token):
+    def _send_revocation_email(self, company, api_key):
         html_body = f"""
         <html>
           <body style="font-family: Arial, sans-serif;">
             <h1>API Key revocada exitosamente</h1>
-            <p><strong>Key revocada:</strong> {token.token[:30]}...</p>
+            <p><strong>Key revocada:</strong> {api_key.key_value[:30]}...</p>
             <p>Esta key ya no funcionara en futuras peticiones.</p>
           </body>
         </html>

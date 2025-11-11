@@ -1,18 +1,18 @@
 from datetime import datetime
 import uuid
-from src.domain.entities.token import Token
+from src.domain.entities.api_key import ApiKey
 from src.domain.repositories.application_repository import ApplicationRepository
 from src.domain.repositories.company_repository import CompanyRepository
-from src.domain.repositories.token_repository import TokenRepository
-from src.domain.value_objects.token_value import TokenValue
+from src.domain.repositories.api_key_repository import ApiKeyRepository
+from src.domain.value_objects.api_key_value import ApiKeyValue
 from src.domain.value_objects.api_key_prefix import ApiKeyPrefix
 from src.infrastructure.messaging.rabbitmq_client import RabbitMQClient
 
 class GenerateNewApiKeyUseCase:
-    def __init__(self, application_repo: ApplicationRepository, company_repo: CompanyRepository, token_repo: TokenRepository, rabbitmq_client: RabbitMQClient):
+    def __init__(self, application_repo: ApplicationRepository, company_repo: CompanyRepository, api_key_repo: ApiKeyRepository, rabbitmq_client: RabbitMQClient):
         self.application_repo = application_repo
         self.company_repo = company_repo
-        self.token_repo = token_repo
+        self.api_key_repo = api_key_repo
         self.rabbitmq_client = rabbitmq_client
 
     def execute(self, application_id: str) -> dict:
@@ -31,27 +31,28 @@ class GenerateNewApiKeyUseCase:
             raise ValueError(f"Empresa esta inactiva")
 
         prefix = ApiKeyPrefix.generate(application.platform, application.environment)
-        token_value_obj = TokenValue()
-        key_value = f"{prefix}{str(token_value_obj)}"
+        api_key_value_obj = ApiKeyValue()
+        key_value = f"{prefix}{str(api_key_value_obj)}"
 
-        token = Token(
+        api_key = ApiKey(
             id=None,
-            token=key_value,
+            key_value=key_value,
             company_id=application.company_id,
+            application_id=application.id,
             created_at=datetime.utcnow(),
             expires_at=None,
-            last_used=None,
+            last_used_at=None,
             is_active=True
         )
 
-        created_token = self.token_repo.create(token)
+        created_api_key = self.api_key_repo.create(api_key)
 
         self._publish_log(f"Nueva API key generada para aplicacion: {application_id}", "info")
-        self._send_generation_email(company, application, created_token)
+        self._send_generation_email(company, application, created_api_key)
 
-        return {'api_key': created_token.token}
+        return {'api_key': created_api_key.key_value}
 
-    def _send_generation_email(self, company, application, token):
+    def _send_generation_email(self, company, application, api_key):
         html_body = f"""
         <html>
           <body style="font-family: Arial, sans-serif;">
@@ -59,7 +60,7 @@ class GenerateNewApiKeyUseCase:
             <p><strong>Aplicacion:</strong> {application.name}</p>
             <p><strong>Plataforma:</strong> {application.platform}</p>
             <p><strong>Ambiente:</strong> {application.environment}</p>
-            <p><strong>Nueva API Key:</strong> {token.token}</p>
+            <p><strong>Nueva API Key:</strong> {api_key.key_value}</p>
             <br>
             <p><strong>Recomendacion:</strong> Actualiza tu aplicacion con la nueva key. Las keys anteriores seguiran funcionando hasta que las revoques manualmente.</p>
           </body>

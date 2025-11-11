@@ -2,29 +2,29 @@ from datetime import datetime, timedelta
 import secrets
 import uuid
 from src.domain.entities.revocation_token import RevocationToken
-from src.domain.repositories.token_repository import TokenRepository
+from src.domain.repositories.api_key_repository import ApiKeyRepository
 from src.domain.repositories.application_repository import ApplicationRepository
 from src.domain.repositories.company_repository import CompanyRepository
 from src.domain.repositories.revocation_token_repository import RevocationTokenRepository
 from src.infrastructure.messaging.rabbitmq_client import RabbitMQClient
 
 class RequestRevokeApiKeyUseCase:
-    def __init__(self, token_repo: TokenRepository, application_repo: ApplicationRepository, company_repo: CompanyRepository, revocation_token_repo: RevocationTokenRepository, rabbitmq_client: RabbitMQClient):
-        self.token_repo = token_repo
+    def __init__(self, api_key_repo: ApiKeyRepository, application_repo: ApplicationRepository, company_repo: CompanyRepository, revocation_token_repo: RevocationTokenRepository, rabbitmq_client: RabbitMQClient):
+        self.api_key_repo = api_key_repo
         self.application_repo = application_repo
         self.company_repo = company_repo
         self.revocation_token_repo = revocation_token_repo
         self.rabbitmq_client = rabbitmq_client
 
     def execute(self, api_key_id: str) -> dict:
-        token = self.token_repo.get_by_id(api_key_id)
-        if not token:
+        api_key = self.api_key_repo.get_by_id(api_key_id)
+        if not api_key:
             self._publish_log(f"Intento de solicitar revocacion de key inexistente: {api_key_id}", "error")
             raise ValueError("API key no existe")
 
-        company = self.company_repo.get_by_id(str(token.company_id))
+        company = self.company_repo.get_by_id(str(api_key.company_id))
         if not company:
-            self._publish_log(f"Empresa inexistente para token: {api_key_id}", "error")
+            self._publish_log(f"Empresa inexistente para API key: {api_key_id}", "error")
             raise ValueError("Empresa no existe")
 
         confirmation_code = ''.join([str(secrets.randbelow(10)) for _ in range(6)])
@@ -40,7 +40,7 @@ class RequestRevokeApiKeyUseCase:
 
         self.revocation_token_repo.create(revocation_token)
 
-        self._send_confirmation_email(company, token, confirmation_code)
+        self._send_confirmation_email(company, api_key, confirmation_code)
         self._publish_log(f"Codigo de revocacion generado para key: {api_key_id}", "info")
 
         return {
@@ -48,13 +48,13 @@ class RequestRevokeApiKeyUseCase:
             'expires_in': 300
         }
 
-    def _send_confirmation_email(self, company, token, code):
+    def _send_confirmation_email(self, company, api_key, code):
         html_body = f"""
         <html>
           <body style="font-family: Arial, sans-serif;">
             <h1>Confirma la revocacion de API Key</h1>
             <p>Has solicitado revocar una API key.</p>
-            <p><strong>Key:</strong> {token.token[:30]}...</p>
+            <p><strong>Key:</strong> {api_key.key_value[:30]}...</p>
             <br>
             <div style="background-color: #f0f0f0; padding: 20px; text-align: center;">
               <h2 style="color: #333; font-size: 32px; letter-spacing: 5px;">{code}</h2>
