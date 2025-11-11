@@ -4,18 +4,26 @@ from fastapi.responses import JSONResponse
 from src.infrastructure.config.settings import SERVICE_PORT, AUTH_SERVICE_URL, LOG_SERVICE_URL
 from src.infrastructure.http.http_client import HTTPClient
 from src.infrastructure.messaging.rabbitmq_client import RabbitMQClient
+from src.infrastructure.cache.redis_client import RedisClient
+from src.infrastructure.messaging.cache_invalidation_consumer import CacheInvalidationConsumer
 from src.presentation.middleware.gateway_middleware import GatewayMiddleware
 from src.presentation.routes.gateway_routes import router
 
 http_client = HTTPClient()
 rabbitmq_client = RabbitMQClient()
+redis_client = RedisClient()
+cache_consumer = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    global cache_consumer
     print("API Gateway iniciado")
+    cache_consumer = CacheInvalidationConsumer()
+    cache_consumer.start()
     yield
     await http_client.close()
     rabbitmq_client.close()
+    redis_client.close()
     print("API Gateway detenido")
 
 app = FastAPI(
@@ -27,7 +35,7 @@ app = FastAPI(
     openapi_url=None
 )
 
-app.add_middleware(GatewayMiddleware, http_client=http_client, rabbitmq_client=rabbitmq_client)
+app.add_middleware(GatewayMiddleware, http_client=http_client, rabbitmq_client=rabbitmq_client, redis_client=redis_client)
 app.include_router(router)
 
 @app.get("/health")

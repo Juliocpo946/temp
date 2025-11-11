@@ -20,6 +20,10 @@ class TokenRepositoryImpl(TokenRepository):
         self.db.refresh(db_token)
         return self._to_domain(db_token)
 
+    def get_by_id(self, token_id: str) -> Optional[Token]:
+        db_token = self.db.query(TokenModel).filter(TokenModel.id == token_id).first()
+        return self._to_domain(db_token) if db_token else None
+
     def get_by_token(self, token_value: str) -> Optional[Token]:
         db_token = self.db.query(TokenModel).filter(TokenModel.token == token_value).first()
         return self._to_domain(db_token) if db_token else None

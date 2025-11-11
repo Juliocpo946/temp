@@ -5,6 +5,7 @@ from src.infrastructure.persistence.database import engine, Base
 from src.infrastructure.config.settings import SERVICE_PORT
 from src.presentation.routes.company_routes import auth_router
 from src.presentation.routes.token_routes import token_routes
+from src.presentation.routes.application_routes import application_routes
 
 Base.metadata.create_all(bind=engine)
 
@@ -18,6 +19,7 @@ app = FastAPI(title="Auth Service", version="1.0.0", lifespan=lifespan)
 
 app.include_router(auth_router)
 app.include_router(token_routes)
+app.include_router(application_routes)
 
 @app.get("/health")
 def health_check(request: Request):

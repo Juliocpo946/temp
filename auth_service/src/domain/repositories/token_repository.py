@@ -8,6 +8,10 @@ class TokenRepository(ABC):
         pass
 
     @abstractmethod
+    def get_by_id(self, token_id: str) -> Optional[Token]:
+        pass
+
+    @abstractmethod
     def get_by_token(self, token_value: str) -> Optional[Token]:
         pass
 
