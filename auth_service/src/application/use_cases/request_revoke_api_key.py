@@ -1,19 +1,19 @@
 from datetime import datetime, timedelta
 import secrets
 import uuid
-from src.domain.entities.revocation_token import RevocationToken
+from src.domain.entities.revocation_api_key import RevocationApiKey
 from src.domain.repositories.api_key_repository import ApiKeyRepository
 from src.domain.repositories.application_repository import ApplicationRepository
 from src.domain.repositories.company_repository import CompanyRepository
-from src.domain.repositories.revocation_token_repository import RevocationTokenRepository
+from src.domain.repositories.revocation_api_key_repository import RevocationApiKeyRepository
 from src.infrastructure.messaging.rabbitmq_client import RabbitMQClient
 
 class RequestRevokeApiKeyUseCase:
-    def __init__(self, api_key_repo: ApiKeyRepository, application_repo: ApplicationRepository, company_repo: CompanyRepository, revocation_token_repo: RevocationTokenRepository, rabbitmq_client: RabbitMQClient):
+    def __init__(self, api_key_repo: ApiKeyRepository, application_repo: ApplicationRepository, company_repo: CompanyRepository, revocation_api_key_repo: RevocationApiKeyRepository, rabbitmq_client: RabbitMQClient):
         self.api_key_repo = api_key_repo
         self.application_repo = application_repo
         self.company_repo = company_repo
-        self.revocation_token_repo = revocation_token_repo
+        self.revocation_api_key_repo = revocation_api_key_repo
         self.rabbitmq_client = rabbitmq_client
 
     def execute(self, api_key_id: str) -> dict:
@@ -29,7 +29,7 @@ class RequestRevokeApiKeyUseCase:
 
         confirmation_code = ''.join([str(secrets.randbelow(10)) for _ in range(6)])
         
-        revocation_token = RevocationToken(
+        revocation_api_key = RevocationApiKey(
             id=None,
             api_key_id=uuid.UUID(api_key_id),
             confirmation_code=confirmation_code,
@@ -38,7 +38,7 @@ class RequestRevokeApiKeyUseCase:
             is_used=False
         )
 
-        self.revocation_token_repo.create(revocation_token)
+        self.revocation_api_key_repo.create(revocation_api_key)
 
         self._send_confirmation_email(company, api_key, confirmation_code)
         self._publish_log(f"Codigo de revocacion generado para key: {api_key_id}", "info")

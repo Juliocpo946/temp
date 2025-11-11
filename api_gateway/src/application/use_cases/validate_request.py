@@ -7,26 +7,26 @@ class ValidateRequestUseCase:
         self.http_client = http_client
         self.rabbitmq_client = rabbitmq_client
 
-    async def execute(self, token: str) -> dict:
+    async def execute(self, api_key: str) -> dict:
         try:
-            validation_url = f"{AUTH_SERVICE_URL}/auth/tokens/validate"
+            validation_url = f"{AUTH_SERVICE_URL}/auth/api_keys/validate"
             response = await self.http_client.post(
                 validation_url,
-                json={"token": token}
+                json={"api_key": api_key}
             )
             
             if response.get('valid'):
-                self._publish_log(f"Token validado correctamente", "info")
+                self._publish_log(f"Api key validado correctamente", "info")
                 return {
                     'valid': True,
                     'company_id': response.get('company_id')
                 }
             else:
-                self._publish_log(f"Token inválido", "error")
+                self._publish_log(f"Api key inválida", "error")
                 return {'valid': False, 'company_id': None}
                 
         except Exception as e:
-            self._publish_log(f"Error al validar token: {str(e)}", "error")
+            self._publish_log(f"Error al validar api key: {str(e)}", "error")
             return {'valid': False, 'company_id': None}
 
     def _publish_log(self, message: str, level: str) -> None:

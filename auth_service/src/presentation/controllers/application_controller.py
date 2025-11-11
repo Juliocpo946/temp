@@ -4,7 +4,7 @@ from src.infrastructure.persistence.database import get_db
 from src.infrastructure.persistence.repositories.application_repository_impl import ApplicationRepositoryImpl
 from src.infrastructure.persistence.repositories.company_repository_impl import CompanyRepositoryImpl
 from src.infrastructure.persistence.repositories.api_key_repository_impl import ApiKeyRepositoryImpl
-from src.infrastructure.persistence.repositories.revocation_token_repository_impl import RevocationTokenRepositoryImpl
+from auth_service.src.infrastructure.persistence.repositories.revocation_api_key_repository_impl import RevocationApiKeyRepositoryImpl
 from src.infrastructure.messaging.rabbitmq_client import RabbitMQClient
 from src.application.use_cases.create_application import CreateApplicationUseCase
 from src.application.use_cases.get_applications import GetApplicationsUseCase
@@ -77,8 +77,8 @@ def request_revoke_api_key(api_key_id: str, db: Session = Depends(get_db)):
         api_key_repo = ApiKeyRepositoryImpl(db)
         application_repo = ApplicationRepositoryImpl(db)
         company_repo = CompanyRepositoryImpl(db)
-        revocation_token_repo = RevocationTokenRepositoryImpl(db)
-        use_case = RequestRevokeApiKeyUseCase(api_key_repo, application_repo, company_repo, revocation_token_repo, rabbitmq_client)
+        revocation_api_key_repo = RevocationApiKeyRepositoryImpl(db)
+        use_case = RequestRevokeApiKeyUseCase(api_key_repo, application_repo, company_repo, revocation_api_key_repo, rabbitmq_client)
         result = use_case.execute(api_key_id)
         return result
     except ValueError as e:
@@ -93,8 +93,8 @@ def confirm_revoke_api_key(api_key_id: str, confirm_data: ConfirmRevokeSchema, d
         api_key_repo = ApiKeyRepositoryImpl(db)
         application_repo = ApplicationRepositoryImpl(db)
         company_repo = CompanyRepositoryImpl(db)
-        revocation_token_repo = RevocationTokenRepositoryImpl(db)
-        use_case = ConfirmRevokeApiKeyUseCase(api_key_repo, application_repo, company_repo, revocation_token_repo, rabbitmq_client)
+        revocation_api_key_repo = RevocationApiKeyRepositoryImpl(db)
+        use_case = ConfirmRevokeApiKeyUseCase(api_key_repo, application_repo, company_repo, revocation_api_key_repo, rabbitmq_client)
         result = use_case.execute(api_key_id, confirm_data.confirmation_code)
         return result
     except ValueError as e:

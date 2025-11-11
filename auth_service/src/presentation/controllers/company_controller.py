@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from src.infrastructure.persistence.database import get_db
 from src.infrastructure.persistence.repositories.company_repository_impl import CompanyRepositoryImpl
-from src.infrastructure.persistence.repositories.token_repository_impl import TokenRepositoryImpl
+from src.infrastructure.persistence.repositories.api_key_repository_impl import ApiKeyRepositoryImpl
 from src.infrastructure.messaging.rabbitmq_client import RabbitMQClient
 from src.application.use_cases.register_company import RegisterCompanyUseCase
 from src.application.use_cases.get_company import GetCompanyUseCase
@@ -16,8 +16,8 @@ rabbitmq_client = RabbitMQClient()
 def register_company(company: CompanyCreateSchema, db: Session = Depends(get_db)):
     try:
         company_repo = CompanyRepositoryImpl(db)
-        token_repo = TokenRepositoryImpl(db)
-        use_case = RegisterCompanyUseCase(company_repo, token_repo, rabbitmq_client)
+        api_key_repo = ApiKeyRepositoryImpl(db)
+        use_case = RegisterCompanyUseCase(company_repo, api_key_repo, rabbitmq_client)
         result = use_case.execute(company.name, company.email)
         return result
     except ValueError as e:
