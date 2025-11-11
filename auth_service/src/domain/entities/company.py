@@ -1,9 +1,10 @@
 from datetime import datetime
 from typing import Optional
+import uuid
 
 class Company:
-    def __init__(self, id: int, name: str, email: str, is_active: bool, created_at: datetime, updated_at: datetime):
-        self.id = id
+    def __init__(self, id: Optional[uuid.UUID], name: str, email: str, is_active: bool, created_at: datetime, updated_at: datetime):
+        self.id = id or uuid.uuid4()
         self.name = name
         self.email = email
         self.is_active = is_active

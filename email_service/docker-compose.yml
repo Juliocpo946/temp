@@ -1,0 +1,13 @@
+services:
+  email_service:
+    build: .
+    ports:
+      - "3003:3003"
+    env_file:
+      - .env
+    networks:
+      - microservices
+
+networks:
+  microservices:
+    driver: bridge

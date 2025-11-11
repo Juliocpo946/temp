@@ -1,13 +1,14 @@
-from sqlalchemy import Column, String, Boolean, DateTime, Integer, ForeignKey
+from sqlalchemy import Column, String, Boolean, DateTime, Uuid, ForeignKey
 from datetime import datetime
+import uuid
 from src.infrastructure.persistence.database import Base
 
 class TokenModel(Base):
     __tablename__ = "tokens"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Uuid, primary_key=True, default=uuid.uuid4, index=True)
     token = Column(String(500), unique=True, nullable=False, index=True)
-    company_id = Column(Integer, ForeignKey("companies.id"), nullable=False)
+    company_id = Column(Uuid, ForeignKey("companies.id"), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     expires_at = Column(DateTime, nullable=True)
     last_used = Column(DateTime, nullable=True)

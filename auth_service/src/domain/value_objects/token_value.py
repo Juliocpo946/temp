@@ -7,7 +7,7 @@ class TokenValue:
 
     @staticmethod
     def _generate() -> str:
-        return secrets.token_urlsafe(32)
+        return secrets.token_urlsafe(128)
 
     def __str__(self) -> str:
         return self.value

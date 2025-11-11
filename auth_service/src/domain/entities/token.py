@@ -1,9 +1,10 @@
 from datetime import datetime
 from typing import Optional
+import uuid
 
 class Token:
-    def __init__(self, id: int, token: str, company_id: int, created_at: datetime, expires_at: Optional[datetime], last_used: Optional[datetime], is_active: bool):
-        self.id = id
+    def __init__(self, id: Optional[uuid.UUID], token: str, company_id: uuid.UUID, created_at: datetime, expires_at: Optional[datetime], last_used: Optional[datetime], is_active: bool):
+        self.id = id or uuid.uuid4()
         self.token = token
         self.company_id = company_id
         self.created_at = created_at
