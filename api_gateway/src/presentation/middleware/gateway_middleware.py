@@ -100,5 +100,4 @@ class GatewayMiddleware(BaseHTTPMiddleware):
             )
             return response
         except Exception as e:
-            print(f"Error al validar API key: {str(e)}")
             return {'valid': False, 'company_id': None, 'application_id': None}

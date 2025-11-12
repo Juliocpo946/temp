@@ -51,21 +51,18 @@ class CreateSessionUseCase:
         )
         self.config_repo.create(config)
 
-        session_dto = SessionDTO(
-            str(created_session.id),
-            created_session.user_id,
-            str(created_session.company_id),
-            created_session.disability_type,
-            created_session.cognitive_analysis_enabled,
-            created_session.status,
-            created_session.current_activity,
-            created_session.created_at,
-            created_session.last_heartbeat_at,
-            created_session.ended_at
-        )
+        self._publish_log(f"Sesion creada: {created_session.id}", "info")
 
         return {
             'session_id': str(created_session.id),
             'status': created_session.status,
             'created_at': created_session.created_at.isoformat()
         }
+
+    def _publish_log(self, message: str, level: str) -> None:
+        log_message = {
+            'service': 'session-service',
+            'level': level,
+            'message': message
+        }
+        self.rabbitmq_client.publish('logs', log_message)

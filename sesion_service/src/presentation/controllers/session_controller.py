@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from src.infrastructure.persistence.database import get_db
 from src.infrastructure.persistence.repositories.session_repository_impl import SessionRepositoryImpl
@@ -24,8 +24,9 @@ router = APIRouter()
 rabbitmq_client = RabbitMQClient()
 
 @router.post("/", response_model=SessionResponseSchema)
-def create_session(session_data: SessionCreateSchema, company_id: str, db: Session = Depends(get_db)):
+def create_session(request: Request, session_data: SessionCreateSchema, db: Session = Depends(get_db)):
     try:
+        company_id = request.state.company_id
         session_repo = SessionRepositoryImpl(db)
         config_repo = AnalysisConfigRepositoryImpl(db)
         use_case = CreateSessionUseCase(session_repo, config_repo, rabbitmq_client)
@@ -45,7 +46,7 @@ def create_session(session_data: SessionCreateSchema, company_id: str, db: Sessi
 def update_heartbeat(session_id: str, db: Session = Depends(get_db)):
     try:
         session_repo = SessionRepositoryImpl(db)
-        use_case = UpdateHeartbeatUseCase(session_repo)
+        use_case = UpdateHeartbeatUseCase(session_repo, rabbitmq_client)
         result = use_case.execute(session_id)
         return result
     except ValueError as e:
@@ -58,7 +59,7 @@ def pause_session(session_id: str, db: Session = Depends(get_db)):
     try:
         session_repo = SessionRepositoryImpl(db)
         pause_log_repo = PauseLogRepositoryImpl(db)
-        use_case = PauseSessionUseCase(session_repo, pause_log_repo)
+        use_case = PauseSessionUseCase(session_repo, pause_log_repo, rabbitmq_client)
         result = use_case.execute(session_id)
         return result
     except ValueError as e:
@@ -71,7 +72,7 @@ def resume_session(session_id: str, db: Session = Depends(get_db)):
     try:
         session_repo = SessionRepositoryImpl(db)
         pause_log_repo = PauseLogRepositoryImpl(db)
-        use_case = ResumeSessionUseCase(session_repo, pause_log_repo)
+        use_case = ResumeSessionUseCase(session_repo, pause_log_repo, rabbitmq_client)
         result = use_case.execute(session_id)
         return result
     except ValueError as e:
@@ -83,7 +84,7 @@ def resume_session(session_id: str, db: Session = Depends(get_db)):
 def finalize_session(session_id: str, db: Session = Depends(get_db)):
     try:
         session_repo = SessionRepositoryImpl(db)
-        use_case = FinalizeSessionUseCase(session_repo)
+        use_case = FinalizeSessionUseCase(session_repo, rabbitmq_client)
         result = use_case.execute(session_id)
         return result
     except ValueError as e:
@@ -96,7 +97,7 @@ def start_activity(session_id: str, activity_data: ActivityStartSchema, db: Sess
     try:
         session_repo = SessionRepositoryImpl(db)
         activity_log_repo = ActivityLogRepositoryImpl(db)
-        use_case = StartActivityUseCase(session_repo, activity_log_repo)
+        use_case = StartActivityUseCase(session_repo, activity_log_repo, rabbitmq_client)
         result = use_case.execute(
             session_id,
             activity_data.external_activity_id,
@@ -116,7 +117,7 @@ def complete_activity(session_id: str, activity_data: ActivityCompleteSchema, db
     try:
         session_repo = SessionRepositoryImpl(db)
         activity_log_repo = ActivityLogRepositoryImpl(db)
-        use_case = CompleteActivityUseCase(session_repo, activity_log_repo)
+        use_case = CompleteActivityUseCase(session_repo, activity_log_repo, rabbitmq_client)
         result = use_case.execute(
             session_id,
             activity_data.external_activity_id,
@@ -133,7 +134,7 @@ def abandon_activity(session_id: str, activity_data: ActivityAbandonSchema, db: 
     try:
         session_repo = SessionRepositoryImpl(db)
         activity_log_repo = ActivityLogRepositoryImpl(db)
-        use_case = AbandonActivityUseCase(session_repo, activity_log_repo)
+        use_case = AbandonActivityUseCase(session_repo, activity_log_repo, rabbitmq_client)
         result = use_case.execute(session_id, activity_data.external_activity_id)
         return result
     except ValueError as e:
@@ -145,7 +146,7 @@ def abandon_activity(session_id: str, activity_data: ActivityAbandonSchema, db: 
 def get_session(session_id: str, db: Session = Depends(get_db)):
     try:
         session_repo = SessionRepositoryImpl(db)
-        use_case = GetSessionUseCase(session_repo)
+        use_case = GetSessionUseCase(session_repo, rabbitmq_client)
         result = use_case.execute(session_id)
         return result
     except ValueError as e:
@@ -157,7 +158,7 @@ def get_session(session_id: str, db: Session = Depends(get_db)):
 def update_config(session_id: str, config_data: ConfigUpdateSchema, db: Session = Depends(get_db)):
     try:
         config_repo = AnalysisConfigRepositoryImpl(db)
-        use_case = UpdateConfigUseCase(config_repo)
+        use_case = UpdateConfigUseCase(config_repo, rabbitmq_client)
         result = use_case.execute(
             session_id,
             config_data.cognitive_analysis_enabled,
