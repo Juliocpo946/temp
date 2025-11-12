@@ -1,0 +1,18 @@
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+POSTGRES_HOST = os.getenv("POSTGRES_HOST")
+POSTGRES_PORT = os.getenv("POSTGRES_PORT")
+POSTGRES_USER = os.getenv("POSTGRES_USER")
+POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD")
+POSTGRES_DATABASE = os.getenv("POSTGRES_DATABASE")
+
+DATABASE_URL = f"postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DATABASE}"
+
+AMQP_URL = os.getenv("AMQP_URL")
+SERVICE_NAME = os.getenv("SERVICE_NAME", "session-service")
+SERVICE_PORT = int(os.getenv("SERVICE_PORT", 3004))
+LOG_SERVICE_QUEUE = os.getenv("LOG_SERVICE_QUEUE", "logs")
+AUTH_SERVICE_URL = os.getenv("AUTH_SERVICE_URL")

@@ -1,0 +1,71 @@
+from datetime import datetime
+import uuid
+from src.domain.entities.session import Session
+from src.domain.entities.analysis_config import AnalysisConfig
+from src.domain.repositories.session_repository import SessionRepository
+from src.domain.repositories.analysis_config_repository import AnalysisConfigRepository
+from src.infrastructure.messaging.rabbitmq_client import RabbitMQClient
+from src.application.dtos.session_dto import SessionDTO
+
+class CreateSessionUseCase:
+    def __init__(
+        self,
+        session_repo: SessionRepository,
+        config_repo: AnalysisConfigRepository,
+        rabbitmq_client: RabbitMQClient
+    ):
+        self.session_repo = session_repo
+        self.config_repo = config_repo
+        self.rabbitmq_client = rabbitmq_client
+
+    def execute(
+        self,
+        user_id: int,
+        company_id: str,
+        disability_type: str,
+        cognitive_analysis_enabled: bool
+    ) -> dict:
+        session = Session(
+            id=None,
+            user_id=user_id,
+            company_id=uuid.UUID(company_id),
+            disability_type=disability_type,
+            cognitive_analysis_enabled=cognitive_analysis_enabled,
+            status="activa",
+            current_activity=None,
+            created_at=datetime.utcnow(),
+            last_heartbeat_at=datetime.utcnow(),
+            ended_at=None
+        )
+
+        created_session = self.session_repo.create(session)
+
+        config = AnalysisConfig(
+            id=None,
+            session_id=created_session.id,
+            cognitive_analysis_enabled=cognitive_analysis_enabled,
+            text_notifications=True,
+            video_suggestions=True,
+            vibration_alerts=True,
+            pause_suggestions=True
+        )
+        self.config_repo.create(config)
+
+        session_dto = SessionDTO(
+            str(created_session.id),
+            created_session.user_id,
+            str(created_session.company_id),
+            created_session.disability_type,
+            created_session.cognitive_analysis_enabled,
+            created_session.status,
+            created_session.current_activity,
+            created_session.created_at,
+            created_session.last_heartbeat_at,
+            created_session.ended_at
+        )
+
+        return {
+            'session_id': str(created_session.id),
+            'status': created_session.status,
+            'created_at': created_session.created_at.isoformat()
+        }
