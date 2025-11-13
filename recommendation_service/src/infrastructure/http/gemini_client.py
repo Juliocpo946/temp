@@ -1,5 +1,6 @@
 import google.generativeai as genai
-from typing import Optional, Dict, Any
+from typing import Optional
+from datetime import datetime
 from src.infrastructure.config.settings import GEMINI_API_KEY
 
 class GeminiClient:
@@ -38,8 +39,8 @@ Solo texto, sin explicaciones adicionales."""
             response = self.model.generate_content(prompt)
             return response.text if response else None
             
-        except Exception as e:
-            print(f"[ERROR] Error generating content with Gemini: {str(e)}")
+        except Exception:
+            print(f"[{self._timestamp()}] [GEMINI] [ERROR] Error generando contenido específico")
             return None
 
     async def generate_generic_content(
@@ -66,8 +67,8 @@ Solo texto, sin explicaciones adicionales."""
             response = self.model.generate_content(prompt)
             return response.text if response else None
             
-        except Exception as e:
-            print(f"[ERROR] Error generating generic content with Gemini: {str(e)}")
+        except Exception:
+            print(f"[{self._timestamp()}] [GEMINI] [ERROR] Error generando contenido genérico")
             return None
 
     @staticmethod
@@ -79,3 +80,7 @@ Solo texto, sin explicaciones adicionales."""
             'distraccion': 50
         }
         return max_words_map.get(recommendation_type, 50)
+
+    @staticmethod
+    def _timestamp() -> str:
+        return datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')

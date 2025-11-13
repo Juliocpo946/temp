@@ -1,5 +1,6 @@
 import httpx
 from typing import Optional, Dict, Any
+from datetime import datetime
 from src.infrastructure.config.settings import CONTENT_SERVICE_URL, HTTP_TIMEOUT
 
 class ContentClient:
@@ -38,11 +39,11 @@ class ContentClient:
                     return response.json()
                 return None
                 
-        except httpx.HTTPError as e:
-            print(f"[ERROR] Error searching specific content: {str(e)}")
+        except httpx.HTTPError:
+            print(f"[{self._timestamp()}] [CONTENT_CLIENT] [ERROR] Error buscando contenido específico")
             return None
-        except Exception as e:
-            print(f"[ERROR] Unexpected error in specific search: {str(e)}")
+        except Exception:
+            print(f"[{self._timestamp()}] [CONTENT_CLIENT] [ERROR] Error inesperado")
             return None
 
     async def search_generic(
@@ -72,9 +73,13 @@ class ContentClient:
                     return response.json()
                 return None
                 
-        except httpx.HTTPError as e:
-            print(f"[ERROR] Error searching generic content: {str(e)}")
+        except httpx.HTTPError:
+            print(f"[{self._timestamp()}] [CONTENT_CLIENT] [ERROR] Error buscando contenido genérico")
             return None
-        except Exception as e:
-            print(f"[ERROR] Unexpected error in generic search: {str(e)}")
+        except Exception:
+            print(f"[{self._timestamp()}] [CONTENT_CLIENT] [ERROR] Error inesperado")
             return None
+
+    @staticmethod
+    def _timestamp() -> str:
+        return datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')

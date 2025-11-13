@@ -1,0 +1,389 @@
+{
+  "title": "Gramática de Lengua de Señas Mexicana (LSM)",
+  "description": "Guía completa para construir oraciones en LSM con reglas gramaticales, ejemplos y casos de uso",
+
+  "estructura_basica": {
+    "orden": "Tiempo → Lugar → Sujeto → Objeto → Verbo → Modificador/Negación",
+    "componentes": {
+      "tiempo": {
+        "descripcion": "Cuándo sucede la acción",
+        "ejemplos": ["ayer", "mañana", "próximo", "pasado", "hoy"]
+      },
+      "lugar": {
+        "descripcion": "Dónde sucede la acción",
+        "ejemplos": ["escuela", "casa", "mercado", "Cuernavaca", "restaurante"]
+      },
+      "sujeto": {
+        "descripcion": "Quién realiza la acción",
+        "ejemplos": ["yo", "tú", "él", "ella", "nosotros", "ellos"]
+      },
+      "objeto": {
+        "descripcion": "Sobre qué/quién recae la acción",
+        "ejemplos": ["libro", "comida", "hermanos", "dinero", "pollo"]
+      },
+      "verbo": {
+        "descripcion": "Acción principal (no se conjuga - forma única para todos los tiempos)",
+        "ejemplos": ["comer", "ir", "jugar", "tener", "estudiar", "trabajar"]
+      },
+      "modificador": {
+        "descripcion": "Adjetivos, negación o intensificadores (siempre al final)",
+        "ejemplos": ["grande", "nuevo", "rápido", "no", "muy"]
+      }
+    }
+  },
+
+  "reglas_fundamentales": [
+    {
+      "regla": "Sin artículos",
+      "descripcion": "No se usan artículos como 'el', 'la', 'un', 'una', 'unos', 'unas'",
+      "ejemplo_incorrecto": "El libro grande",
+      "ejemplo_correcto": "Libro grande"
+    },
+    {
+      "regla": "Sin preposiciones",
+      "descripcion": "No se usan 'de', 'en', 'con', 'para', etc.",
+      "ejemplo_incorrecto": "Voy a la escuela",
+      "ejemplo_correcto": "Escuela yo ir"
+    },
+    {
+      "regla": "Sin género ni plural explícito",
+      "descripcion": "El género y número se infieren del contexto o señas adicionales"
+    },
+    {
+      "regla": "Verbos sin conjugación",
+      "descripcion": "El verbo mantiene la misma forma independientemente del tiempo o persona. El tiempo se marca al inicio de la oración",
+      "ejemplos": {
+        "presente": "Yo trabajar",
+        "pasado": "Ayer yo trabajar",
+        "futuro": "Mañana yo trabajar"
+      }
+    },
+    {
+      "regla": "Negación al final",
+      "descripcion": "La palabra 'no' siempre va al final de la oración, acompañada de expresión facial de negación",
+      "ejemplo": "Yo chocolate querer no"
+    },
+    {
+      "regla": "Adjetivos después del objeto",
+      "descripcion": "Los calificativos siempre van después del sustantivo que modifican",
+      "ejemplo": "Libro nuevo (no 'nuevo libro')"
+    },
+    {
+      "regla": "Preguntas con palabra interrogativa al final",
+      "descripcion": "Las palabras como 'qué', 'dónde', 'cuándo', 'cuánto' van al final, con expresión facial interrogativa (cejas arriba)",
+      "ejemplo": "Tú comer qué?"
+    }
+  ],
+
+  "tipos_de_oraciones": {
+    "afirmativas": {
+      "descripcion": "Siguen el orden básico: Tiempo - Lugar - Sujeto - Objeto - Verbo - Modificador",
+      "ejemplos": [
+        {
+          "español": "Yo estudié ayer",
+          "lsm": "Ayer yo estudiar",
+          "analisis": "Tiempo + Sujeto + Verbo"
+        },
+        {
+          "español": "Nosotros vamos al mercado",
+          "lsm": "Mercado nosotros ir",
+          "analisis": "Lugar + Sujeto + Verbo"
+        },
+        {
+          "español": "Ella lee un libro nuevo",
+          "lsm": "Ella libro leer nuevo",
+          "analisis": "Sujeto + Objeto + Verbo + Adjetivo"
+        },
+        {
+          "español": "Ayer comí pasta en el restaurante",
+          "lsm": "Ayer restaurante yo pasta comer",
+          "analisis": "Tiempo + Lugar + Sujeto + Objeto + Verbo"
+        }
+      ]
+    },
+
+    "negativas": {
+      "descripcion": "Igual que afirmativas pero añadiendo 'no' al final + expresión facial negativa",
+      "ejemplos": [
+        {
+          "español": "No me gusta bailar",
+          "lsm": "Yo bailar no",
+          "analisis": "Sujeto + Verbo + Negación"
+        },
+        {
+          "español": "No tengo dinero",
+          "lsm": "Dinero yo tener no",
+          "analisis": "Objeto + Sujeto + Verbo + Negación"
+        },
+        {
+          "español": "No vamos al cine",
+          "lsm": "Cine nosotros ir no",
+          "analisis": "Lugar + Sujeto + Verbo + Negación"
+        },
+        {
+          "español": "No entiendo",
+          "lsm": "Yo entender no",
+          "analisis": "Sujeto + Verbo + Negación"
+        }
+      ]
+    },
+
+    "interrogativas_cerradas": {
+      "descripcion": "Preguntas de sí/no. Se marcan principalmente con expresión facial (cejas arriba), sin palabra interrogativa",
+      "ejemplos": [
+        {
+          "español": "¿Tienes hermanos?",
+          "lsm": "Tú hermanos tener? (cejas arriba)",
+          "nota": "La interrogación es facial, no léxica"
+        },
+        {
+          "español": "¿Estudiaste?",
+          "lsm": "Tú estudiar? (cejas arriba)",
+          "nota": "Expresión facial interrogativa es obligatoria"
+        },
+        {
+          "español": "¿Tiene casa?",
+          "lsm": "Casa él tener? (cejas arriba)",
+          "analisis": "Objeto + Sujeto + Verbo + gesto pregunta"
+        }
+      ]
+    },
+
+    "interrogativas_abiertas": {
+      "descripcion": "Preguntas con qué, dónde, cuándo, cómo, cuánto. La palabra interrogativa va al final + expresión facial",
+      "ejemplos": [
+        {
+          "español": "¿Qué quieres comer?",
+          "lsm": "Tú comer qué? (cejas arriba)",
+          "analisis": "Sujeto + Verbo + Interrogativo"
+        },
+        {
+          "español": "¿Dónde vive Juan?",
+          "lsm": "Juan vivir dónde? (cejas arriba)",
+          "analisis": "Sujeto + Verbo + Interrogativo"
+        },
+        {
+          "español": "¿Cuándo comes?",
+          "lsm": "Tú comer cuándo? (cejas arriba)",
+          "analisis": "Sujeto + Verbo + Interrogativo"
+        },
+        {
+          "español": "¿Cuánto cuesta?",
+          "lsm": "Dinero cuánto? (cejas arriba)",
+          "analisis": "Objeto + Interrogativo"
+        },
+        {
+          "español": "¿Dónde está el libro?",
+          "lsm": "Libro estar dónde? (cejas arriba)",
+          "analisis": "Objeto + Verbo + Interrogativo"
+        }
+      ]
+    },
+
+    "localizacion_espacial": {
+      "descripcion": "Oraciones que expresan relaciones espaciales. Estructura: Lugar + Posición + Sujeto + Verbo",
+      "ejemplos": [
+        {
+          "español": "El gato está debajo de la mesa",
+          "lsm": "Mesa debajo gato haber",
+          "analisis": "Lugar + Posición + Sujeto + Verbo"
+        },
+        {
+          "español": "El lápiz está en la bolsa",
+          "lsm": "Bolsa lápiz estar-dentro",
+          "analisis": "Lugar + Objeto + Verbo locativo"
+        },
+        {
+          "español": "Hay una mosca en la sopa",
+          "lsm": "Sopa mosca haber",
+          "analisis": "Lugar + Objeto + Verbo"
+        },
+        {
+          "español": "El perro duerme abajo de la mesa",
+          "lsm": "Mesa abajo perro dormir",
+          "analisis": "Lugar + Posición + Sujeto + Verbo"
+        }
+      ]
+    },
+
+    "con_adjetivos": {
+      "descripcion": "Adjetivos y modificadores siempre después del objeto o verbo que modifican",
+      "ejemplos": [
+        {
+          "español": "Ella tiene un libro nuevo",
+          "lsm": "Ella libro tener nuevo",
+          "analisis": "Sujeto + Objeto + Verbo + Adjetivo"
+        },
+        {
+          "español": "Juan es muy guapo",
+          "lsm": "Juan guapo muy",
+          "nota": "Se acompaña con expresión facial de énfasis"
+        },
+        {
+          "español": "La sopa está caliente",
+          "lsm": "Sopa caliente",
+          "analisis": "Objeto + Adjetivo"
+        },
+        {
+          "español": "Casa vieja",
+          "lsm": "Casa vieja",
+          "analisis": "Objeto + Adjetivo"
+        }
+      ]
+    },
+
+    "con_tiempo_y_lugar": {
+      "descripcion": "Cuando incluyen marcadores temporales y espaciales. Tiempo siempre primero, lugar antes del sujeto",
+      "ejemplos": [
+        {
+          "español": "Yo jugué futbol el mes pasado en Cuernavaca",
+          "lsm": "Mes pasado Cuernavaca yo futbol jugar",
+          "analisis": "Tiempo + Lugar + Sujeto + Objeto + Verbo"
+        },
+        {
+          "español": "Próximas vacaciones iré a Acapulco",
+          "lsm": "Próximo diciembre Acapulco yo vacaciones ir",
+          "analisis": "Tiempo + Lugar + Sujeto + Objeto + Verbo"
+        },
+        {
+          "español": "Mañana voy a la escuela",
+          "lsm": "Mañana escuela yo ir",
+          "analisis": "Tiempo + Lugar + Sujeto + Verbo"
+        },
+        {
+          "español": "En casa estudiamos hoy",
+          "lsm": "Hoy casa nosotros estudiar",
+          "analisis": "Tiempo + Lugar + Sujeto + Verbo"
+        }
+      ]
+    }
+  },
+
+  "componentes_no_manuales": {
+    "descripcion": "Elementos visuales y corporales esenciales en LSM",
+    "elementos": [
+      {
+        "tipo": "Expresión facial para negación",
+        "descripcion": "Mueca negativa, movimiento de cabeza lateral",
+        "uso": "Acompaña la palabra 'no' al final de oraciones negativas"
+      },
+      {
+        "tipo": "Expresión facial para preguntas",
+        "descripcion": "Cejas levantadas, cabeza ligeramente hacia atrás",
+        "uso": "Marca interrogación en preguntas abiertas y cerradas"
+      },
+      {
+        "tipo": "Expresión facial para énfasis",
+        "descripcion": "Ojos abiertos, gesto exagerado",
+        "uso": "Intensifica adjetivos o acciones"
+      },
+      {
+        "tipo": "Clasificadores",
+        "descripcion": "Gestos especiales que indican forma, tamaño, posición de objetos",
+        "ejemplos": [
+          "Forma de contenedor para 'bolsa' o 'caja'",
+          "Movimiento para 'animal cuadrúpedo'",
+          "Superficie plana para 'mesa' o 'piso'"
+        ]
+      },
+      {
+        "tipo": "Uso del espacio",
+        "descripcion": "El espacio frente al cuerpo se usa para ubicar elementos, indicar dirección y relaciones",
+        "nota": "La orientación de las manos y dirección del movimiento modifican el significado"
+      }
+    ]
+  },
+
+  "guia_rapida_construccion": {
+    "pasos": [
+      "1. Si aplica, empezar con marcador temporal (ayer, mañana, hoy)",
+      "2. Si aplica, indicar el lugar (escuela, casa, mercado)",
+      "3. Indicar el sujeto (yo, tú, él, nosotros)",
+      "4. Si hay objeto directo, mencionarlo",
+      "5. Añadir el verbo (en forma base, sin conjugar)",
+      "6. Al final: adjetivos, modificadores, negación o palabra interrogativa",
+      "7. Acompañar con expresión facial apropiada (negación, pregunta, énfasis)"
+    ],
+    "ejemplo_completo": {
+      "español": "¿Dónde compra Carlos pan?",
+      "lsm": "Pan Carlos comprar dónde? (cejas arriba)",
+      "desglose": {
+        "objeto": "Pan",
+        "sujeto": "Carlos",
+        "verbo": "comprar",
+        "interrogativo": "dónde",
+        "expresion_facial": "cejas arriba"
+      }
+    }
+  },
+
+  "errores_comunes_a_evitar": [
+    {
+      "error": "Usar artículos",
+      "incorrecto": "El libro está en la mesa",
+      "correcto": "Mesa libro estar"
+    },
+    {
+      "error": "Usar preposiciones",
+      "incorrecto": "Voy a la casa de María",
+      "correcto": "Casa María yo ir"
+    },
+    {
+      "error": "Conjugar verbos",
+      "incorrecto": "Yo trabajé, tú trabajas, él trabajará",
+      "correcto": "Ayer yo trabajar, Tú trabajar, Mañana él trabajar"
+    },
+    {
+      "error": "Poner adjetivos antes del sustantivo",
+      "incorrecto": "Nuevo libro",
+      "correcto": "Libro nuevo"
+    },
+    {
+      "error": "Poner negación al principio o en medio",
+      "incorrecto": "No yo quiero",
+      "correcto": "Yo querer no"
+    },
+    {
+      "error": "Poner palabra interrogativa al principio",
+      "incorrecto": "¿Dónde tú vives?",
+      "correcto": "Tú vivir dónde? (cejas arriba)"
+    }
+  ],
+
+  "faq": [
+    {
+      "pregunta": "¿Se usan artículos en LSM?",
+      "respuesta": "No, nunca se usan artículos como 'el', 'la', 'un', 'una'"
+    },
+    {
+      "pregunta": "¿Dónde va la negación?",
+      "respuesta": "Siempre al final de la oración, acompañada de expresión facial negativa"
+    },
+    {
+      "pregunta": "¿Cómo se marca una pregunta?",
+      "respuesta": "Con palabra interrogativa al final (para preguntas abiertas) y/o expresión facial con cejas levantadas (obligatorio)"
+    },
+    {
+      "pregunta": "¿Hay plural y género en LSM?",
+      "respuesta": "No se marcan con palabras específicas, se infieren del contexto o con señas adicionales"
+    },
+    {
+      "pregunta": "¿Los verbos se conjugan?",
+      "respuesta": "No, los verbos mantienen la misma forma. El tiempo se indica con marcadores temporales al inicio"
+    },
+    {
+      "pregunta": "¿Dónde van los adjetivos?",
+      "respuesta": "Siempre después del objeto o sustantivo que modifican"
+    }
+  ],
+
+  "notas_para_ia": [
+    "Al generar oraciones en LSM, NUNCA incluir artículos ni preposiciones",
+    "Verificar que la negación siempre esté al final",
+    "Verificar que los adjetivos estén después del sustantivo",
+    "En preguntas abiertas, la palabra interrogativa debe ir al final",
+    "Los verbos no cambian de forma - siempre usar infinitivo sin 'r' final",
+    "El orden básico es: Tiempo - Lugar - Sujeto - Objeto - Verbo - Modificador",
+    "La expresión facial es parte esencial de la gramática, no solo decorativa"
+  ]
+}
