@@ -2,6 +2,7 @@ from datetime import datetime
 from src.domain.entities.activity_log import ActivityLog
 from src.domain.repositories.session_repository import SessionRepository
 from src.domain.repositories.activity_log_repository import ActivityLogRepository
+from src.domain.repositories.external_activity_repository import ExternalActivityRepository
 from src.infrastructure.messaging.rabbitmq_client import RabbitMQClient
 
 class StartActivityUseCase:
@@ -9,10 +10,12 @@ class StartActivityUseCase:
         self,
         session_repo: SessionRepository,
         activity_log_repo: ActivityLogRepository,
+        external_activity_repo: ExternalActivityRepository,
         rabbitmq_client: RabbitMQClient
     ):
         self.session_repo = session_repo
         self.activity_log_repo = activity_log_repo
+        self.external_activity_repo = external_activity_repo
         self.rabbitmq_client = rabbitmq_client
 
     def execute(
@@ -29,14 +32,18 @@ class StartActivityUseCase:
             self._publish_log(f"Sesion no encontrada: {session_id}", "error")
             raise ValueError("Sesion no encontrada")
 
+        external_activity = self.external_activity_repo.get_or_create(
+            external_activity_id,
+            title,
+            subtitle,
+            content,
+            activity_type
+        )
+
         activity_log = ActivityLog(
             id=None,
             session_id=session.id,
             external_activity_id=external_activity_id,
-            title=title,
-            subtitle=subtitle,
-            content=content,
-            activity_type=activity_type,
             status="en_progreso",
             started_at=datetime.utcnow(),
             completed_at=None,
@@ -52,7 +59,7 @@ class StartActivityUseCase:
         }
         self.session_repo.update(session)
 
-        self._publish_log(f"Actividad iniciada: {title}", "info")
+        self._publish_log(f"Actividad iniciada: {title}", "error")
 
         return {'status': 'activity_started'}
 

@@ -5,6 +5,7 @@ from src.infrastructure.persistence.repositories.session_repository_impl import 
 from src.infrastructure.persistence.repositories.activity_log_repository_impl import ActivityLogRepositoryImpl
 from src.infrastructure.persistence.repositories.pause_log_repository_impl import PauseLogRepositoryImpl
 from src.infrastructure.persistence.repositories.analysis_config_repository_impl import AnalysisConfigRepositoryImpl
+from src.infrastructure.persistence.repositories.external_activity_repository_impl import ExternalActivityRepositoryImpl
 from src.infrastructure.messaging.rabbitmq_client import RabbitMQClient
 from src.application.use_cases.create_session import CreateSessionUseCase
 from src.application.use_cases.update_heartbeat import UpdateHeartbeatUseCase
@@ -97,7 +98,8 @@ def start_activity(session_id: str, activity_data: ActivityStartSchema, db: Sess
     try:
         session_repo = SessionRepositoryImpl(db)
         activity_log_repo = ActivityLogRepositoryImpl(db)
-        use_case = StartActivityUseCase(session_repo, activity_log_repo, rabbitmq_client)
+        external_activity_repo = ExternalActivityRepositoryImpl(db)
+        use_case = StartActivityUseCase(session_repo, activity_log_repo, external_activity_repo, rabbitmq_client)
         result = use_case.execute(
             session_id,
             activity_data.external_activity_id,

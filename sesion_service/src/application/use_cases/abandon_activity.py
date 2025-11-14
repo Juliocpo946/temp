@@ -35,7 +35,7 @@ class AbandonActivityUseCase:
         session.current_activity = None
         self.session_repo.update(session)
 
-        self._publish_log(f"Actividad abandonada: {external_activity_id}", "info")
+        self._publish_log(f"Actividad abandonada: {external_activity_id}", "error")
 
         return {'status': 'abandonada'}
 

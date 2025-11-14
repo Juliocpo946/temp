@@ -13,10 +13,6 @@ class ActivityLogRepositoryImpl(ActivityLogRepository):
         db_activity = ActivityLogModel(
             session_id=activity_log.session_id,
             external_activity_id=activity_log.external_activity_id,
-            title=activity_log.title,
-            subtitle=activity_log.subtitle,
-            content=activity_log.content,
-            activity_type=activity_log.activity_type,
             status=activity_log.status,
             feedback_data=activity_log.feedback_data
         )
@@ -50,10 +46,6 @@ class ActivityLogRepositoryImpl(ActivityLogRepository):
             id=db_activity.id,
             session_id=db_activity.session_id,
             external_activity_id=db_activity.external_activity_id,
-            title=db_activity.title,
-            subtitle=db_activity.subtitle,
-            content=db_activity.content,
-            activity_type=db_activity.activity_type,
             status=db_activity.status,
             started_at=db_activity.started_at,
             completed_at=db_activity.completed_at,

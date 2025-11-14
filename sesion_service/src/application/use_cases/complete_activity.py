@@ -40,7 +40,7 @@ class CompleteActivityUseCase:
         session.current_activity = None
         self.session_repo.update(session)
 
-        self._publish_log(f"Actividad completada: {external_activity_id}", "info")
+        self._publish_log(f"Actividad completada: {external_activity_id}", "error")
 
         return {'status': 'completada'}
 
