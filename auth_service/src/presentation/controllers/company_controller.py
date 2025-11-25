@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Header
 from sqlalchemy.orm import Session
 from src.infrastructure.persistence.database import get_db
 from src.infrastructure.persistence.repositories.company_repository_impl import CompanyRepositoryImpl
@@ -75,25 +75,50 @@ def verify_login(verify_data: VerifyLoginSchema, db: Session = Depends(get_db)):
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 @router.get("/{company_id}", response_model=dict)
-def get_company(company_id: str, db: Session = Depends(get_db)):
+def get_company(
+    company_id: str, 
+    db: Session = Depends(get_db),
+    x_company_id: str = Header(None, alias="X-Company-ID")
+):
     try:
+        if not x_company_id:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Company ID requerido")
+        
+        if x_company_id != company_id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No tienes permisos para ver esta empresa")
+        
         company_repo = CompanyRepositoryImpl(db)
         use_case = GetCompanyUseCase(company_repo, rabbitmq_client)
         result = use_case.execute(company_id)
         return result
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 @router.put("/{company_id}", response_model=dict)
-def update_company(company_id: str, company_data: CompanyUpdateSchema, db: Session = Depends(get_db)):
+def update_company(
+    company_id: str, 
+    company_data: CompanyUpdateSchema, 
+    db: Session = Depends(get_db),
+    x_company_id: str = Header(None, alias="X-Company-ID")
+):
     try:
+        if not x_company_id:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Company ID requerido")
+        
+        if x_company_id != company_id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No tienes permisos para modificar esta empresa")
+        
         company_repo = CompanyRepositoryImpl(db)
         use_case = UpdateCompanyUseCase(company_repo, rabbitmq_client)
         result = use_case.execute(company_id, company_data.name, company_data.email, company_data.is_active)
         return result
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))

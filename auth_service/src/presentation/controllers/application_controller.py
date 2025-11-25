@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Header
 from sqlalchemy.orm import Session
 from src.infrastructure.persistence.database import get_db
 from src.infrastructure.persistence.repositories.application_repository_impl import ApplicationRepositoryImpl
@@ -19,27 +19,44 @@ router = APIRouter()
 rabbitmq_client = RabbitMQClient()
 
 @router.post("/")
-async def create_application(application_data: ApplicationCreateSchema, company_id: str = Query(...), db: Session = Depends(get_db)):
+async def create_application(
+    application_data: ApplicationCreateSchema, 
+    db: Session = Depends(get_db),
+    x_company_id: str = Header(None, alias="X-Company-ID")
+):
     try:
+        if not x_company_id:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Company ID requerido")
+        
         application_repo = ApplicationRepositoryImpl(db)
         company_repo = CompanyRepositoryImpl(db)
         api_key_repo = ApiKeyRepositoryImpl(db)
         use_case = CreateApplicationUseCase(application_repo, company_repo, api_key_repo, rabbitmq_client)
-        result = use_case.execute(company_id, application_data.name, application_data.platform, application_data.environment)
+        result = use_case.execute(x_company_id, application_data.name, application_data.platform, application_data.environment)
         return result
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"Error detallado: {traceback.format_exc()}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 @router.get("/")
-async def get_applications(company_id: str = Query(...), db: Session = Depends(get_db)):
+async def get_applications(
+    db: Session = Depends(get_db),
+    x_company_id: str = Header(None, alias="X-Company-ID")
+):
     try:
+        if not x_company_id:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Company ID requerido")
+        
         application_repo = ApplicationRepositoryImpl(db)
         use_case = GetApplicationsUseCase(application_repo, rabbitmq_client)
-        result = use_case.execute(company_id)
+        result = use_case.execute(x_company_id)
         return result
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"Error detallado: {traceback.format_exc()}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
@@ -58,8 +75,15 @@ async def get_application(application_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 @router.post("/{application_id}/generate-key")
-async def generate_api_key(application_id: str, db: Session = Depends(get_db)):
+async def generate_api_key(
+    application_id: str, 
+    db: Session = Depends(get_db),
+    x_company_id: str = Header(None, alias="X-Company-ID")
+):
     try:
+        if not x_company_id:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Company ID requerido")
+        
         application_repo = ApplicationRepositoryImpl(db)
         company_repo = CompanyRepositoryImpl(db)
         api_key_repo = ApiKeyRepositoryImpl(db)
@@ -68,6 +92,8 @@ async def generate_api_key(application_id: str, db: Session = Depends(get_db)):
         return ApiKeyResponseSchema(api_key=result['api_key'])
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"Error detallado: {traceback.format_exc()}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))

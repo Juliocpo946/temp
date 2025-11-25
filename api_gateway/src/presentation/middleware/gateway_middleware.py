@@ -28,7 +28,8 @@ class GatewayMiddleware(BaseHTTPMiddleware):
             '/auth/companies/request-verification',
             '/auth/companies/register',
             '/auth/companies/login',
-            '/auth/companies/verify-login'
+            '/auth/companies/verify-login',
+            '/auth/api-keys/validate'
         ]
         
         admin_paths = [
