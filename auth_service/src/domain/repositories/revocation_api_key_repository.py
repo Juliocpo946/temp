@@ -18,3 +18,15 @@ class RevocationApiKeyRepository(ABC):
     @abstractmethod
     def update(self, revocation_api_key: RevocationApiKey) -> RevocationApiKey:
         pass
+
+    @abstractmethod
+    def invalidate_previous_codes(self, api_key_id: str) -> int:
+        pass
+
+    @abstractmethod
+    def delete_expired(self) -> int:
+        pass
+
+    @abstractmethod
+    def count_recent_attempts(self, api_key_id: str, minutes: int) -> int:
+        pass

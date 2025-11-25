@@ -1,5 +1,6 @@
 from typing import Optional
 from sqlalchemy.orm import Session
+from datetime import datetime, timedelta
 from src.domain.entities.email_verification import EmailVerification
 from src.domain.repositories.email_verification_repository import EmailVerificationRepository
 from src.infrastructure.persistence.models.email_verification_model import EmailVerificationModel
@@ -42,6 +43,28 @@ class EmailVerificationRepositoryImpl(EmailVerificationRepository):
             self.db.refresh(db_verification)
             return self._to_domain(db_verification)
         return email_verification
+
+    def invalidate_previous_codes(self, email: str) -> int:
+        result = self.db.query(EmailVerificationModel).filter(
+            EmailVerificationModel.email == email,
+            EmailVerificationModel.is_used == False
+        ).update({EmailVerificationModel.is_used: True})
+        self.db.commit()
+        return result
+
+    def delete_expired(self) -> int:
+        result = self.db.query(EmailVerificationModel).filter(
+            EmailVerificationModel.expires_at < datetime.utcnow()
+        ).delete()
+        self.db.commit()
+        return result
+
+    def count_recent_attempts(self, email: str, minutes: int) -> int:
+        time_threshold = datetime.utcnow() - timedelta(minutes=minutes)
+        return self.db.query(EmailVerificationModel).filter(
+            EmailVerificationModel.email == email,
+            EmailVerificationModel.created_at > time_threshold
+        ).count()
 
     @staticmethod
     def _to_domain(db_verification: EmailVerificationModel) -> EmailVerification:

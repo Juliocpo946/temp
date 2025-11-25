@@ -16,24 +16,23 @@ class ConfirmRevokeApiKeyUseCase:
         revocation_api_key = self.revocation_api_key_repo.get_by_code(confirmation_code)
         
         if not revocation_api_key:
-            self._publish_log(f"Codigo de confirmacion invalido", "error")
             raise ValueError("Codigo de confirmacion invalido")
 
         if str(revocation_api_key.api_key_id) != api_key_id:
-            self._publish_log(f"Codigo no corresponde a la key solicitada", "error")
             raise ValueError("Codigo no corresponde a esta API key")
 
-        if revocation_api_key.is_expired():
-            self._publish_log(f"Codigo de confirmacion expirado", "error")
-            raise ValueError("Codigo de confirmacion expirado")
-
         if revocation_api_key.is_used:
-            self._publish_log(f"Codigo ya fue utilizado", "error")
             raise ValueError("Codigo ya fue utilizado")
+
+        if revocation_api_key.is_expired():
+            raise ValueError("Codigo de confirmacion expirado")
 
         api_key = self.api_key_repo.get_by_id(api_key_id)
         if not api_key:
             raise ValueError("API key no existe")
+
+        if not api_key.is_active:
+            raise ValueError("API key ya esta revocada")
 
         company = self.company_repo.get_by_id(str(api_key.company_id))
 
@@ -42,10 +41,10 @@ class ConfirmRevokeApiKeyUseCase:
 
         revocation_api_key.mark_as_used()
         self.revocation_api_key_repo.update(revocation_api_key)
+        self.revocation_api_key_repo.delete_expired()
 
         self._publish_cache_invalidation(api_key.key_value)
         self._send_revocation_email(company, api_key)
-        self._publish_log(f"API key revocada: {api_key_id}", "info")
 
         return {'success': True, 'message': 'API key revocada exitosamente'}
 
@@ -71,11 +70,3 @@ class ConfirmRevokeApiKeyUseCase:
             'subject': 'API Key revocada exitosamente',
             'html_body': html_body
         })
-
-    def _publish_log(self, message: str, level: str) -> None:
-        log_message = {
-            'service': 'auth-service',
-            'level': level,
-            'message': message
-        }
-        self.rabbitmq_client.publish('logs', log_message)

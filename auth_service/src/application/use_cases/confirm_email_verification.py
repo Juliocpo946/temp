@@ -14,28 +14,23 @@ class ConfirmEmailVerificationUseCase:
         self.rabbitmq_client = rabbitmq_client
 
     def execute(self, name: str, email: str, verification_code: str) -> dict:
+        existing_company = self.company_repo.get_by_email(email)
+        if existing_company:
+            raise ValueError(f"Email {email} ya esta registrado")
+
         email_verification = self.email_verification_repo.get_by_code(verification_code)
         
         if not email_verification:
-            self._publish_log(f"Codigo de verificacion invalido", "error")
             raise ValueError("Codigo de verificacion invalido")
 
         if email_verification.email != email:
-            self._publish_log(f"Email no corresponde al codigo", "error")
             raise ValueError("Email no corresponde al codigo de verificacion")
 
-        if email_verification.is_expired():
-            self._publish_log(f"Codigo de verificacion expirado", "error")
-            raise ValueError("Codigo de verificacion expirado")
-
         if email_verification.is_used:
-            self._publish_log(f"Codigo ya fue utilizado", "error")
             raise ValueError("Codigo ya fue utilizado")
 
-        existing_company = self.company_repo.get_by_email(email)
-        if existing_company:
-            self._publish_log(f"Email ya registrado: {email}", "error")
-            raise ValueError(f"Email {email} ya esta registrado")
+        if email_verification.is_expired():
+            raise ValueError("Codigo de verificacion expirado")
 
         company = Company(
             id=None,
@@ -50,8 +45,8 @@ class ConfirmEmailVerificationUseCase:
 
         email_verification.mark_as_used()
         self.email_verification_repo.update(email_verification)
+        self.email_verification_repo.delete_expired()
 
-        self._publish_log(f"Empresa registrada: {created_company.email}", "info")
         self._send_welcome_email(created_company)
 
         return {
@@ -85,11 +80,3 @@ class ConfirmEmailVerificationUseCase:
             'subject': 'Bienvenido - Registro exitoso',
             'html_body': html_body
         })
-
-    def _publish_log(self, message: str, level: str) -> None:
-        log_message = {
-            'service': 'auth-service',
-            'level': level,
-            'message': message
-        }
-        self.rabbitmq_client.publish('logs', log_message)

@@ -1,5 +1,6 @@
 from typing import Optional
 from sqlalchemy.orm import Session
+from datetime import datetime, timedelta
 import uuid
 from src.domain.entities.revocation_api_key import RevocationApiKey
 from src.domain.repositories.revocation_api_key_repository import RevocationApiKeyRepository
@@ -37,6 +38,28 @@ class RevocationApiKeyRepositoryImpl(RevocationApiKeyRepository):
             self.db.refresh(db_revocation_api_key)
             return self._to_domain(db_revocation_api_key)
         return revocation_api_key
+
+    def invalidate_previous_codes(self, api_key_id: str) -> int:
+        result = self.db.query(RevocationApiKeyModel).filter(
+            RevocationApiKeyModel.api_key_id == uuid.UUID(api_key_id),
+            RevocationApiKeyModel.is_used == False
+        ).update({RevocationApiKeyModel.is_used: True})
+        self.db.commit()
+        return result
+
+    def delete_expired(self) -> int:
+        result = self.db.query(RevocationApiKeyModel).filter(
+            RevocationApiKeyModel.expires_at < datetime.utcnow()
+        ).delete()
+        self.db.commit()
+        return result
+
+    def count_recent_attempts(self, api_key_id: str, minutes: int) -> int:
+        time_threshold = datetime.utcnow() - timedelta(minutes=minutes)
+        return self.db.query(RevocationApiKeyModel).filter(
+            RevocationApiKeyModel.api_key_id == uuid.UUID(api_key_id),
+            RevocationApiKeyModel.created_at > time_threshold
+        ).count()
 
     @staticmethod
     def _to_domain(db_revocation_api_key: RevocationApiKeyModel) -> RevocationApiKey:

@@ -1,22 +1,22 @@
 from abc import ABC, abstractmethod
 from typing import Optional
-from src.domain.entities.email_verification import EmailVerification
+from src.domain.entities.login_attempt import LoginAttempt
 
-class EmailVerificationRepository(ABC):
+class LoginAttemptRepository(ABC):
     @abstractmethod
-    def create(self, email_verification: EmailVerification) -> EmailVerification:
+    def create(self, login_attempt: LoginAttempt) -> LoginAttempt:
         pass
 
     @abstractmethod
-    def get_by_code(self, verification_code: str) -> Optional[EmailVerification]:
+    def get_by_code(self, otp_code: str) -> Optional[LoginAttempt]:
         pass
 
     @abstractmethod
-    def get_by_email(self, email: str) -> Optional[EmailVerification]:
+    def get_by_email(self, email: str) -> Optional[LoginAttempt]:
         pass
 
     @abstractmethod
-    def update(self, email_verification: EmailVerification) -> EmailVerification:
+    def update(self, login_attempt: LoginAttempt) -> LoginAttempt:
         pass
 
     @abstractmethod
