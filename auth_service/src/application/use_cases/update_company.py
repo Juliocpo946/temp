@@ -22,8 +22,8 @@ class UpdateCompanyUseCase:
 
         if name:
             company.name = name
-        if email:
-            company.email = email
+        # if email:
+        #     company.email = email
         if is_active is not None:
             if is_active:
                 company.activate()

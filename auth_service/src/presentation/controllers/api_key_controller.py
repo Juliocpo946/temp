@@ -25,3 +25,20 @@ def validate_api_key(request_data: ApiKeyValidationRequestSchema, db: Session = 
     except Exception as e:
         print(f"Error al validar API key: {str(e)}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error interno del servidor")
+    
+@router.get("/by-key-value/{key_value}")
+def get_api_key_by_value(key_value: str, db: Session = Depends(get_db)):
+    try:
+        api_key_repo = ApiKeyRepositoryImpl(db)
+        api_key = api_key_repo.get_by_key_value(key_value)
+        if not api_key:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="API key no encontrada")
+        return {
+            'id': str(api_key.id),
+            'key_value': api_key.key_value,
+            'company_id': str(api_key.company_id),
+            'application_id': str(api_key.application_id),
+            'is_active': api_key.is_active
+        }
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))

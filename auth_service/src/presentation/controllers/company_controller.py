@@ -43,7 +43,7 @@ def register_company(confirm_data: ConfirmVerificationSchema, db: Session = Depe
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 @router.get("/{company_id}", response_model=dict)
-def get_company(company_id: int, db: Session = Depends(get_db)):
+def get_company(company_id: str, db: Session = Depends(get_db)):
     try:
         company_repo = CompanyRepositoryImpl(db)
         use_case = GetCompanyUseCase(company_repo, rabbitmq_client)
@@ -55,7 +55,7 @@ def get_company(company_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 @router.put("/{company_id}", response_model=dict)
-def update_company(company_id: int, company_data: CompanyUpdateSchema, db: Session = Depends(get_db)):
+def update_company(company_id: str, company_data: CompanyUpdateSchema, db: Session = Depends(get_db)):
     try:
         company_repo = CompanyRepositoryImpl(db)
         use_case = UpdateCompanyUseCase(company_repo, rabbitmq_client)
