@@ -9,3 +9,8 @@ rapido.txt
 /testing
 token.txt
 /resources
+
+venv/
+env/
+.venv/
+ENV/
