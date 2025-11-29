@@ -22,7 +22,7 @@ class SMTPClient:
             part = MIMEText(html_body, "html")
             message.attach(part)
 
-            async with aiosmtplib.SMTP(hostname=self.host, port=self.port) as smtp:
+            async with aiosmtplib.SMTP(hostname=self.host, port=self.port, use_tls=True) as smtp:
                 await smtp.login(self.user, self.password)
                 await smtp.sendmail(self.from_email, to_email, message.as_string())
             

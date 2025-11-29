@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Header
 from sqlalchemy.orm import Session
 from src.infrastructure.persistence.database import get_db
 from src.infrastructure.persistence.repositories.session_repository_impl import SessionRepositoryImpl
@@ -25,9 +25,12 @@ router = APIRouter()
 rabbitmq_client = RabbitMQClient()
 
 @router.post("/", response_model=SessionResponseSchema)
-def create_session(request: Request, session_data: SessionCreateSchema, db: Session = Depends(get_db)):
+def create_session(request: Request, session_data: SessionCreateSchema, db: Session = Depends(get_db), x_company_id: str = Header(None, alias="X-Company-ID")):
     try:
-        company_id = request.state.company_id
+        if not x_company_id:
+            raise HTTPException(status_code=401, detail="X-Company-ID header missing")
+
+        company_id = x_company_id
         session_repo = SessionRepositoryImpl(db)
         config_repo = AnalysisConfigRepositoryImpl(db)
         use_case = CreateSessionUseCase(session_repo, config_repo, rabbitmq_client)
@@ -41,6 +44,7 @@ def create_session(request: Request, session_data: SessionCreateSchema, db: Sess
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
+        print(f"Error creando sesión: {str(e)}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 @router.post("/{session_id}/heartbeat", response_model=HeartbeatResponseSchema)

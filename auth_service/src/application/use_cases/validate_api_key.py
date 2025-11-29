@@ -1,6 +1,7 @@
 from src.domain.repositories.api_key_repository import ApiKeyRepository
 from src.domain.repositories.company_repository import CompanyRepository
 from src.infrastructure.messaging.rabbitmq_client import RabbitMQClient
+from src.domain.services.hashing_service import HashingService
 
 class ValidateApiKeyUseCase:
     def __init__(self, api_key_repo: ApiKeyRepository, company_repo: CompanyRepository, rabbitmq_client: RabbitMQClient):
@@ -9,7 +10,9 @@ class ValidateApiKeyUseCase:
         self.rabbitmq_client = rabbitmq_client
 
     def execute(self, key_value: str) -> dict:
-        api_key = self.api_key_repo.get_by_key_value(key_value)
+        hashed_input_key = HashingService.hash_api_key(key_value)
+
+        api_key = self.api_key_repo.get_by_key_value(hashed_input_key)
 
         if not api_key:
             self._publish_log(f"Intento de validacion con API key inexistente", "error")

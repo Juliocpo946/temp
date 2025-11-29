@@ -7,6 +7,7 @@ from src.domain.repositories.api_key_repository import ApiKeyRepository
 from src.domain.value_objects.api_key_value import ApiKeyValue
 from src.domain.value_objects.api_key_prefix import ApiKeyPrefix
 from src.infrastructure.messaging.rabbitmq_client import RabbitMQClient
+from src.domain.services.hashing_service import HashingService
 
 class GenerateNewApiKeyUseCase:
     def __init__(self, application_repo: ApplicationRepository, company_repo: CompanyRepository, api_key_repo: ApiKeyRepository, rabbitmq_client: RabbitMQClient):
@@ -32,11 +33,13 @@ class GenerateNewApiKeyUseCase:
 
         prefix = ApiKeyPrefix.generate(application.platform, application.environment)
         api_key_value_obj = ApiKeyValue()
-        key_value = f"{prefix}{str(api_key_value_obj)}"
+        plain_api_key = f"{prefix}{str(api_key_value_obj)}"
+
+        hashed_api_key = HashingService.hash_api_key(plain_api_key)
 
         api_key = ApiKey(
             id=None,
-            key_value=key_value,
+            key_value=hashed_api_key,
             company_id=application.company_id,
             application_id=application.id,
             created_at=datetime.utcnow(),
@@ -48,11 +51,11 @@ class GenerateNewApiKeyUseCase:
         created_api_key = self.api_key_repo.create(api_key)
 
         self._publish_log(f"Nueva API key generada para aplicacion: {application_id}", "info")
-        self._send_generation_email(company, application, created_api_key)
+        self._send_generation_email(company, application, plain_api_key)
 
-        return {'api_key': created_api_key.key_value}
+        return {'api_key': plain_api_key}
 
-    def _send_generation_email(self, company, application, api_key):
+    def _send_generation_email(self, company, application, plain_api_key):
         html_body = f"""
         <html>
           <body style="font-family: Arial, sans-serif;">

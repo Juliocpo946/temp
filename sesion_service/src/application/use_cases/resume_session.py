@@ -1,3 +1,4 @@
+from datetime import datetime  # <--- Asegúrate de tener este import
 from src.domain.repositories.session_repository import SessionRepository
 from src.domain.repositories.pause_log_repository import PauseLogRepository
 from src.infrastructure.messaging.rabbitmq_client import RabbitMQClient
@@ -27,6 +28,13 @@ class ResumeSessionUseCase:
         if active_pause:
             active_pause.end()
             self.pause_log_repo.update(active_pause)
+
+        event_message = {
+            "type": "session_resumed",
+            "session_id": str(session.id),
+            "timestamp": datetime.utcnow().isoformat()
+        }
+        self.rabbitmq_client.publish("session_events", event_message)
 
         self._publish_log(f"Sesion reanudada: {session_id}", "info")
 

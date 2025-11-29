@@ -9,6 +9,7 @@ from src.domain.value_objects.api_key_value import ApiKeyValue
 from src.domain.value_objects.api_key_prefix import ApiKeyPrefix
 from src.infrastructure.messaging.rabbitmq_client import RabbitMQClient
 from src.application.dtos.application_dto import ApplicationDTO
+from src.domain.services.hashing_service import HashingService
 
 class CreateApplicationUseCase:
     def __init__(self, application_repo: ApplicationRepository, company_repo: CompanyRepository, api_key_repo: ApiKeyRepository, rabbitmq_client: RabbitMQClient):
@@ -41,11 +42,13 @@ class CreateApplicationUseCase:
 
         prefix = ApiKeyPrefix.generate(platform, environment)
         api_key_value_obj = ApiKeyValue()
-        key_value = f"{prefix}{str(api_key_value_obj)}"
+        plain_api_key = f"{prefix}{str(api_key_value_obj)}"
+
+        hashed_api_key = HashingService.hash_api_key(plain_api_key)
 
         api_key = ApiKey(
             id=None,
-            key_value=key_value,
+            key_value=hashed_api_key,
             company_id=uuid.UUID(company_id),
             application_id=created_application.id,
             created_at=datetime.utcnow(),
@@ -57,7 +60,7 @@ class CreateApplicationUseCase:
         created_api_key = self.api_key_repo.create(api_key)
 
         self._publish_log(f"Aplicacion creada: {created_application.name}", "info")
-        self._send_creation_email(company, created_application, created_api_key)
+        self._send_creation_email(company, created_application, plain_api_key)
 
         application_dto = ApplicationDTO(
             str(created_application.id),
@@ -71,10 +74,10 @@ class CreateApplicationUseCase:
 
         return {
             'application': application_dto.to_dict(),
-            'api_key': created_api_key.key_value
+            'api_key': plain_api_key
         }
 
-    def _send_creation_email(self, company, application, api_key):
+    def _send_creation_email(self, company, application, plain_api_key):
         html_body = f"""
         <html>
           <body style="font-family: Arial, sans-serif;">
@@ -82,13 +85,13 @@ class CreateApplicationUseCase:
             <p><strong>Nombre:</strong> {application.name}</p>
             <p><strong>Plataforma:</strong> {application.platform}</p>
             <p><strong>Ambiente:</strong> {application.environment}</p>
-            <p><strong>API Key:</strong> {api_key.key_value}</p>
+            <p><strong>API Key:</strong> {plain_api_key}</p> 
             <br>
             <p style="color: red;"><strong>IMPORTANTE:</strong> Guarda esta API key de forma segura. No la compartas publicamente.</p>
           </body>
         </html>
         """
-        
+
         self.rabbitmq_client.publish('emails', {
             'to_email': company.email,
             'subject': 'Nueva aplicacion creada exitosamente',

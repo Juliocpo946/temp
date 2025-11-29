@@ -33,6 +33,16 @@ class PauseSessionUseCase:
         )
         self.pause_log_repo.create(pause_log)
 
+
+        event_message = {
+            "type": "session_paused",
+            "session_id": str(session.id),
+            "timestamp": datetime.utcnow().isoformat()
+        }
+
+        self.rabbitmq_client.publish("session_events", event_message)
+
+
         self._publish_log(f"Sesion pausada: {session_id}", "info")
 
         return {'status': 'pausada'}

@@ -10,6 +10,6 @@ class ExternalActivityModel(Base):
     external_activity_id = Column(Integer, nullable=False, unique=True, index=True)
     title = Column(String(500), nullable=False)
     subtitle = Column(String(500), nullable=True)
-    content = Column(String, nullable=True)
+    content = Column(String(2000), nullable=True)
     activity_type = Column(String(50), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
