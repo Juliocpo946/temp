@@ -11,12 +11,12 @@ class ContentRepositoryImpl(ContentRepository):
 
     def save(self, content: Content) -> Content:
         model = ContentModel(
-            tema=content.tema,
-            subtema=content.subtema,
-            tipo_actividad=content.tipo_actividad,
-            tipo_intervencion=content.tipo_intervencion,
-            contenido=content.contenido,
-            activo=content.activo
+            topic=content.topic,
+            subtopic=content.subtopic,
+            activity_type=content.activity_type,
+            intervention_type=content.intervention_type,
+            content=content.content,
+            active=content.active
         )
         self.db.add(model)
         self.db.commit()
@@ -31,26 +31,26 @@ class ContentRepositoryImpl(ContentRepository):
 
     def find_by_criteria(
         self,
-        tema: str,
-        tipo_intervencion: str,
-        subtema: Optional[str] = None,
-        tipo_actividad: Optional[str] = None
+        topic: str,
+        intervention_type: str,
+        subtopic: Optional[str] = None,
+        activity_type: Optional[str] = None
     ) -> Optional[Content]:
         query = self.db.query(ContentModel).filter(
-            ContentModel.tema == tema,
-            ContentModel.tipo_intervencion == tipo_intervencion,
-            ContentModel.activo == True
+            ContentModel.topic == topic,
+            ContentModel.intervention_type == intervention_type,
+            ContentModel.active == True
         )
 
-        if subtema is not None:
-            query = query.filter(ContentModel.subtema == subtema)
+        if subtopic is not None:
+            query = query.filter(ContentModel.subtopic == subtopic)
         else:
-            query = query.filter(ContentModel.subtema.is_(None))
+            query = query.filter(ContentModel.subtopic.is_(None))
 
-        if tipo_actividad is not None:
-            query = query.filter(ContentModel.tipo_actividad == tipo_actividad)
+        if activity_type is not None:
+            query = query.filter(ContentModel.activity_type == activity_type)
         else:
-            query = query.filter(ContentModel.tipo_actividad.is_(None))
+            query = query.filter(ContentModel.activity_type.is_(None))
 
         model = query.first()
         if not model:
@@ -59,24 +59,24 @@ class ContentRepositoryImpl(ContentRepository):
 
     def list_all(
         self,
-        tema: Optional[str] = None,
-        subtema: Optional[str] = None,
-        tipo_actividad: Optional[str] = None,
-        tipo_intervencion: Optional[str] = None,
-        activo: Optional[bool] = None
+        topic: Optional[str] = None,
+        subtopic: Optional[str] = None,
+        activity_type: Optional[str] = None,
+        intervention_type: Optional[str] = None,
+        active: Optional[bool] = None
     ) -> List[Content]:
         query = self.db.query(ContentModel)
 
-        if tema is not None:
-            query = query.filter(ContentModel.tema == tema)
-        if subtema is not None:
-            query = query.filter(ContentModel.subtema == subtema)
-        if tipo_actividad is not None:
-            query = query.filter(ContentModel.tipo_actividad == tipo_actividad)
-        if tipo_intervencion is not None:
-            query = query.filter(ContentModel.tipo_intervencion == tipo_intervencion)
-        if activo is not None:
-            query = query.filter(ContentModel.activo == activo)
+        if topic is not None:
+            query = query.filter(ContentModel.topic == topic)
+        if subtopic is not None:
+            query = query.filter(ContentModel.subtopic == subtopic)
+        if activity_type is not None:
+            query = query.filter(ContentModel.activity_type == activity_type)
+        if intervention_type is not None:
+            query = query.filter(ContentModel.intervention_type == intervention_type)
+        if active is not None:
+            query = query.filter(ContentModel.active == active)
 
         models = query.all()
         return [self._to_entity(m) for m in models]
@@ -86,12 +86,12 @@ class ContentRepositoryImpl(ContentRepository):
         if not model:
             return None
 
-        model.tema = content.tema
-        model.subtema = content.subtema
-        model.tipo_actividad = content.tipo_actividad
-        model.tipo_intervencion = content.tipo_intervencion
-        model.contenido = content.contenido
-        model.activo = content.activo
+        model.topic = content.topic
+        model.subtopic = content.subtopic
+        model.activity_type = content.activity_type
+        model.intervention_type = content.intervention_type
+        model.content = content.content
+        model.active = content.active
 
         self.db.commit()
         self.db.refresh(model)
@@ -108,12 +108,12 @@ class ContentRepositoryImpl(ContentRepository):
     def _to_entity(self, model: ContentModel) -> Content:
         return Content(
             id=model.id,
-            tema=model.tema,
-            subtema=model.subtema,
-            tipo_actividad=model.tipo_actividad,
-            tipo_intervencion=model.tipo_intervencion,
-            contenido=model.contenido,
-            activo=model.activo,
+            topic=model.topic,
+            subtopic=model.subtopic,
+            activity_type=model.activity_type,
+            intervention_type=model.intervention_type,
+            content=model.content,
+            active=model.active,
             created_at=model.created_at,
             updated_at=model.updated_at
         )

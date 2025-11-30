@@ -18,3 +18,5 @@ LOG_SERVICE_QUEUE = os.getenv("LOG_SERVICE_QUEUE", "logs")
 
 ACTIVITY_EVENTS_QUEUE = os.getenv("ACTIVITY_EVENTS_QUEUE", "activity_events")
 MONITORING_WEBSOCKET_EVENTS_QUEUE = os.getenv("MONITORING_WEBSOCKET_EVENTS_QUEUE", "monitoring_websocket_events")
+ACTIVITY_DETAILS_REQUEST_QUEUE = os.getenv("ACTIVITY_DETAILS_REQUEST_QUEUE", "activity_details_request")
+ACTIVITY_DETAILS_RESPONSE_QUEUE = os.getenv("ACTIVITY_DETAILS_RESPONSE_QUEUE", "activity_details_response")

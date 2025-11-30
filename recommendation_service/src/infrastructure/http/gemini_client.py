@@ -12,19 +12,19 @@ class GeminiClient:
         self.model = genai.GenerativeModel('gemini-pro')
         self.lsm_prompt = LSMPromptLoader.load()
 
-    async def generate_content(
+    def generate_content(
         self,
-        tipo_intervencion: str,
-        tema: str,
-        subtema: Optional[str],
-        tipo_actividad: Optional[str],
-        titulo: Optional[str],
-        objetivo: Optional[str],
-        evento_cognitivo: str,
+        intervention_type: str,
+        topic: str,
+        subtopic: Optional[str],
+        activity_type: Optional[str],
+        title: Optional[str],
+        objective: Optional[str],
+        cognitive_event: str,
         precision: float
     ) -> Optional[str]:
         try:
-            max_words = self._get_max_words(tipo_intervencion)
+            max_words = self._get_max_words(intervention_type)
 
             json_prompt = {
                 "schema": "education_lsm_v1",
@@ -33,20 +33,20 @@ class GeminiClient:
                     "guidelines": self.lsm_prompt.get("notas_para_ia", [])
                 },
                 "input": {
-                    "tema": tema,
-                    "subtema": subtema,
-                    "tipo_actividad": tipo_actividad,
-                    "titulo": titulo,
-                    "objetivo": objetivo,
-                    "tipo_intervencion": tipo_intervencion,
-                    "estado_estudiante": evento_cognitivo,
-                    "precision_actual": precision,
-                    "max_palabras": max_words
+                    "topic": topic,
+                    "subtopic": subtopic,
+                    "activity_type": activity_type,
+                    "title": title,
+                    "objective": objective,
+                    "intervention_type": intervention_type,
+                    "student_state": cognitive_event,
+                    "current_precision": precision,
+                    "max_words": max_words
                 },
                 "output_requirements": {
-                    "tipo": "recomendacion",
-                    "max_palabras": max_words,
-                    "debe_cumplir": [
+                    "type": "recommendation",
+                    "max_words": max_words,
+                    "must_comply": [
                         "Usar reglas fundamentales de LSM del contexto",
                         "Ser motivador y accesible para el estudiante",
                         "Adaptarse al estado emocional del estudiante",
@@ -65,20 +65,20 @@ Contexto de reglas LSM:
 Genera SOLO el contenido recomendado, sin explicaciones adicionales."""
 
             response = self.model.generate_content(prompt_text)
-            return response.text if response else None
-
-        except Exception:
-            self._log_error("Error generando contenido con Gemini")
+            
+            if response:
+                print(f"[GEMINI_CLIENT] [INFO] Contenido generado exitosamente")
+                return response.text
             return None
 
-    def _get_max_words(self, tipo_intervencion: str) -> int:
+        except Exception as e:
+            print(f"[GEMINI_CLIENT] [ERROR] Error generando contenido con Gemini: {str(e)}")
+            return None
+
+    def _get_max_words(self, intervention_type: str) -> int:
         max_words_map = {
             'vibration': 30,
             'instruction': 60,
             'pause': 40
         }
-        return max_words_map.get(tipo_intervencion, 50)
-
-    def _log_error(self, message: str) -> None:
-        timestamp = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
-        print(f"[{timestamp}] [GEMINI_CLIENT] [ERROR] {message}")
+        return max_words_map.get(intervention_type, 50)

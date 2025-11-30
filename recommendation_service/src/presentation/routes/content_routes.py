@@ -1,4 +1,4 @@
-from typing import Optional, List
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from src.infrastructure.persistence.database import get_db
@@ -23,21 +23,21 @@ def create_content(dto: CreateContentDTO, db: Session = Depends(get_db)):
 
 @router.get("/")
 def list_contents(
-    tema: Optional[str] = Query(None),
-    subtema: Optional[str] = Query(None),
-    tipo_actividad: Optional[str] = Query(None),
-    tipo_intervencion: Optional[str] = Query(None),
-    activo: Optional[bool] = Query(None),
+    topic: Optional[str] = Query(None),
+    subtopic: Optional[str] = Query(None),
+    activity_type: Optional[str] = Query(None),
+    intervention_type: Optional[str] = Query(None),
+    active: Optional[bool] = Query(None),
     db: Session = Depends(get_db)
 ):
     repository = ContentRepositoryImpl(db)
     use_case = ListContentsUseCase(repository)
     filters = ContentFilterDTO(
-        tema=tema,
-        subtema=subtema,
-        tipo_actividad=tipo_actividad,
-        tipo_intervencion=tipo_intervencion,
-        activo=activo
+        topic=topic,
+        subtopic=subtopic,
+        activity_type=activity_type,
+        intervention_type=intervention_type,
+        active=active
     )
     contents = use_case.execute(filters)
     return [c.to_dict() for c in contents]

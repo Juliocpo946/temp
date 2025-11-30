@@ -3,26 +3,26 @@ from pydantic import BaseModel
 
 
 class CreateContentDTO(BaseModel):
-    tema: str
-    subtema: Optional[str] = None
-    tipo_actividad: Optional[str] = None
-    tipo_intervencion: str
-    contenido: str
-    activo: bool = True
+    topic: str
+    subtopic: Optional[str] = None
+    activity_type: Optional[str] = None
+    intervention_type: str
+    content: str
+    active: bool = True
 
 
 class UpdateContentDTO(BaseModel):
-    tema: Optional[str] = None
-    subtema: Optional[str] = None
-    tipo_actividad: Optional[str] = None
-    tipo_intervencion: Optional[str] = None
-    contenido: Optional[str] = None
-    activo: Optional[bool] = None
+    topic: Optional[str] = None
+    subtopic: Optional[str] = None
+    activity_type: Optional[str] = None
+    intervention_type: Optional[str] = None
+    content: Optional[str] = None
+    active: Optional[bool] = None
 
 
 class ContentFilterDTO(BaseModel):
-    tema: Optional[str] = None
-    subtema: Optional[str] = None
-    tipo_actividad: Optional[str] = None
-    tipo_intervencion: Optional[str] = None
-    activo: Optional[bool] = None
+    topic: Optional[str] = None
+    subtopic: Optional[str] = None
+    activity_type: Optional[str] = None
+    intervention_type: Optional[str] = None
+    active: Optional[bool] = None

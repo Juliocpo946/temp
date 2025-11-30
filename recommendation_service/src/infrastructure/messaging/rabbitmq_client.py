@@ -17,7 +17,9 @@ class RabbitMQClient:
             parameters.blocked_connection_timeout = 300
             self.connection = pika.BlockingConnection(parameters)
             self.channel = self.connection.channel()
+            print(f"[RABBITMQ_CLIENT] [INFO] Conectado a RabbitMQ")
         except Exception as e:
+            print(f"[RABBITMQ_CLIENT] [ERROR] Error conectando a RabbitMQ: {str(e)}")
             raise RuntimeError(f"Error conectando a RabbitMQ: {str(e)}")
 
     def _ensure_connection(self) -> None:
@@ -45,8 +47,9 @@ class RabbitMQClient:
                     properties=pika.BasicProperties(delivery_mode=2)
                 )
                 return True
-            except Exception:
+            except Exception as e:
                 retry_count += 1
+                print(f"[RABBITMQ_CLIENT] [ERROR] Error publicando mensaje (intento {retry_count}/{max_retries}): {str(e)}")
                 if retry_count < max_retries:
                     try:
                         self._connect()
@@ -65,13 +68,16 @@ class RabbitMQClient:
                 on_message_callback=callback,
                 auto_ack=False
             )
+            print(f"[RABBITMQ_CLIENT] [INFO] Escuchando en cola: {queue_name}")
             self.channel.start_consuming()
         except Exception as e:
+            print(f"[RABBITMQ_CLIENT] [ERROR] Error consumiendo de RabbitMQ: {str(e)}")
             raise RuntimeError(f"Error consumiendo de RabbitMQ: {str(e)}")
 
     def close(self) -> None:
         try:
             if self.connection and not self.connection.is_closed:
                 self.connection.close()
-        except Exception:
-            pass
+                print(f"[RABBITMQ_CLIENT] [INFO] Desconectado de RabbitMQ")
+        except Exception as e:
+            print(f"[RABBITMQ_CLIENT] [ERROR] Error cerrando conexion: {str(e)}")

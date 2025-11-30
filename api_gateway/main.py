@@ -8,7 +8,7 @@ from src.infrastructure.cache.redis_client import RedisClient
 from src.infrastructure.messaging.cache_invalidation_consumer import CacheInvalidationConsumer
 from src.presentation.middleware.gateway_middleware import GatewayMiddleware
 from src.presentation.routes.gateway_routes import router
-from src.presentation.routes.websocket_routes import router as ws_router
+from src.presentation.routes.gateway_routes import router as ws_router
 
 http_client = HTTPClient()
 rabbitmq_client = RabbitMQClient()

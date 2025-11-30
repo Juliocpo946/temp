@@ -1,44 +1,54 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
-from src.infrastructure.persistence.database import engine, Base
 from src.infrastructure.config.settings import SERVICE_PORT
-from src.infrastructure.messaging.websocket_event_consumer import WebsocketEventConsumer
-from src.presentation.routes.session_routes import router as session_router
-from src.presentation.routes.activity_routes import router as activity_router
+from src.infrastructure.persistence.database import create_tables
+from src.infrastructure.messaging.rabbitmq_client import RabbitMQClient
+from src.infrastructure.messaging.activity_details_consumer import ActivityDetailsConsumer
+from src.presentation.controllers.session_controller import router as session_router
+from src.presentation.controllers.activity_controller import router as activity_router
 
-websocket_consumer = None
+rabbitmq_client = None
+activity_details_consumer = None
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global websocket_consumer
+    global rabbitmq_client, activity_details_consumer
+    print(f"[MAIN] [INFO] Iniciando Session Service...")
+    create_tables()
     
-    Base.metadata.create_all(bind=engine)
+    rabbitmq_client = RabbitMQClient()
+    activity_details_consumer = ActivityDetailsConsumer(rabbitmq_client)
+    activity_details_consumer.start()
     
-    websocket_consumer = WebsocketEventConsumer()
-    websocket_consumer.start()
-    
-    print("[INFO] Session Service iniciado")
+    print(f"[MAIN] [INFO] Session Service iniciado correctamente")
     yield
     
-    if websocket_consumer:
-        websocket_consumer.rabbitmq_client.close()
-    print("[INFO] Session Service detenido")
+    if rabbitmq_client:
+        rabbitmq_client.close()
+    print(f"[MAIN] [INFO] Session Service detenido")
+
 
 app = FastAPI(
     title="Session Service",
     version="2.0.0",
-    lifespan=lifespan,
-    docs_url=None,
-    redoc_url=None,
-    openapi_url=None
+    lifespan=lifespan
 )
 
-app.include_router(session_router)
-app.include_router(activity_router)
 
 @app.get("/health")
 def health_check():
     return {"status": "ok", "service": "session-service"}
+
+
+@app.get("/ready")
+def readiness_check():
+    return {"status": "ready"}
+
+
+app.include_router(session_router, prefix="/sessions", tags=["Sessions"])
+app.include_router(activity_router, prefix="/activities", tags=["Activities"])
+
 
 if __name__ == "__main__":
     import uvicorn

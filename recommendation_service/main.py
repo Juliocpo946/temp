@@ -12,12 +12,15 @@ intervention_consumer = None
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global intervention_consumer
+    print(f"[MAIN] [INFO] Iniciando Recommendation Service...")
     create_tables()
     intervention_consumer = InterventionConsumer()
     intervention_consumer.start()
+    print(f"[MAIN] [INFO] Recommendation Service iniciado correctamente")
     yield
     if intervention_consumer:
         intervention_consumer.close()
+    print(f"[MAIN] [INFO] Recommendation Service detenido")
 
 
 app = FastAPI(

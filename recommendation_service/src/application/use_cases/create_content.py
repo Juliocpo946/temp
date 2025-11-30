@@ -10,11 +10,11 @@ class CreateContentUseCase:
     def execute(self, dto: CreateContentDTO) -> Content:
         content = Content(
             id=None,
-            tema=dto.tema,
-            subtema=dto.subtema,
-            tipo_actividad=dto.tipo_actividad,
-            tipo_intervencion=dto.tipo_intervencion,
-            contenido=dto.contenido,
-            activo=dto.activo
+            topic=dto.topic,
+            subtopic=dto.subtopic,
+            activity_type=dto.activity_type,
+            intervention_type=dto.intervention_type,
+            content=dto.content,
+            active=dto.active
         )
         return self.content_repository.save(content)

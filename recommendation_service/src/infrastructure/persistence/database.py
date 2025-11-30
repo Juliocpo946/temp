@@ -18,3 +18,4 @@ def get_db():
 def create_tables():
     from src.infrastructure.persistence.models.content_model import ContentModel
     Base.metadata.create_all(bind=engine)
+    print(f"[DATABASE] [INFO] Tablas creadas exitosamente")

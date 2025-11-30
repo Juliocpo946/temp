@@ -10,9 +10,9 @@ class ListContentsUseCase:
 
     def execute(self, filters: ContentFilterDTO) -> List[Content]:
         return self.content_repository.list_all(
-            tema=filters.tema,
-            subtema=filters.subtema,
-            tipo_actividad=filters.tipo_actividad,
-            tipo_intervencion=filters.tipo_intervencion,
-            activo=filters.activo
+            topic=filters.topic,
+            subtopic=filters.subtopic,
+            activity_type=filters.activity_type,
+            intervention_type=filters.intervention_type,
+            active=filters.active
         )

@@ -15,21 +15,21 @@ class ContentRepository(ABC):
     @abstractmethod
     def find_by_criteria(
         self,
-        tema: str,
-        tipo_intervencion: str,
-        subtema: Optional[str] = None,
-        tipo_actividad: Optional[str] = None
+        topic: str,
+        intervention_type: str,
+        subtopic: Optional[str] = None,
+        activity_type: Optional[str] = None
     ) -> Optional[Content]:
         pass
 
     @abstractmethod
     def list_all(
         self,
-        tema: Optional[str] = None,
-        subtema: Optional[str] = None,
-        tipo_actividad: Optional[str] = None,
-        tipo_intervencion: Optional[str] = None,
-        activo: Optional[bool] = None
+        topic: Optional[str] = None,
+        subtopic: Optional[str] = None,
+        activity_type: Optional[str] = None,
+        intervention_type: Optional[str] = None,
+        active: Optional[bool] = None
     ) -> List[Content]:
         pass
 
