@@ -9,6 +9,7 @@ SERVICE_ROUTES = {
     "auth": AUTH_SERVICE_URL,
     "logs": LOG_SERVICE_URL,
     "sessions": SESSION_SERVICE_URL,
+    "activities": SESSION_SERVICE_URL,
 }
 
 @router.api_route("/{service}/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
