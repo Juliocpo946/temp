@@ -1,16 +1,19 @@
 import json
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends
-from sqlalchemy.orm import Session
-from src.infrastructure.persistence.database import get_db, SessionLocal
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from src.infrastructure.persistence.database import SessionLocal
 from src.infrastructure.websocket.connection_manager import ConnectionManager
 from src.infrastructure.websocket.frame_handler import FrameHandler
+from src.infrastructure.messaging.rabbitmq_client import RabbitMQClient
+from src.infrastructure.messaging.websocket_event_publisher import WebsocketEventPublisher
 
 router = APIRouter()
 manager = ConnectionManager()
+rabbitmq_client = RabbitMQClient()
+websocket_publisher = WebsocketEventPublisher(rabbitmq_client)
 
-@router.websocket("/ws/{session_id}")
-async def websocket_endpoint(websocket: WebSocket, session_id: str):
-    state = await manager.connect(websocket, session_id)
+@router.websocket("/ws/{session_id}/{activity_uuid}")
+async def websocket_endpoint(websocket: WebSocket, session_id: str, activity_uuid: str):
+    state = await manager.connect(websocket, session_id, activity_uuid)
     db = SessionLocal()
     
     try:
@@ -24,16 +27,35 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
                 await websocket.send_text(json.dumps(result))
                 
     except WebSocketDisconnect:
-        manager.disconnect(session_id)
+        disconnected_state = manager.disconnect(activity_uuid)
+        if disconnected_state:
+            websocket_publisher.publish_websocket_disconnected(
+                activity_uuid=activity_uuid,
+                session_id=session_id,
+                reason="client_disconnected"
+            )
     except Exception as e:
-        print(f"[ERROR] Error en WebSocket {session_id}: {e}")
-        manager.disconnect(session_id)
+        print(f"[ERROR] Error en WebSocket {activity_uuid}: {e}")
+        disconnected_state = manager.disconnect(activity_uuid)
+        if disconnected_state:
+            websocket_publisher.publish_websocket_disconnected(
+                activity_uuid=activity_uuid,
+                session_id=session_id,
+                reason=f"error: {str(e)}"
+            )
     finally:
         db.close()
 
 @router.get("/ws/connections")
 def get_connections():
+    connections = manager.get_all_connections()
     return {
         "active_connections": manager.connection_count,
-        "sessions": list(manager.get_all_sessions().keys())
+        "activities": [
+            {
+                "activity_uuid": uuid,
+                "session_id": state.session_id
+            }
+            for uuid, state in connections.items()
+        ]
     }

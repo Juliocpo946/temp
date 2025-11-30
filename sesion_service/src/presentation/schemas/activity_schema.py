@@ -9,8 +9,8 @@ class ActivityStartSchema(BaseModel):
     activity_type: str
 
 class ActivityCompleteSchema(BaseModel):
-    external_activity_id: int
     feedback: dict
 
-class ActivityAbandonSchema(BaseModel):
-    external_activity_id: int
+class ActivityResponseSchema(BaseModel):
+    status: str
+    activity_uuid: str

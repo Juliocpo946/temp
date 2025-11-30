@@ -1,6 +1,5 @@
 from typing import Optional, List
 from sqlalchemy.orm import Session as DBSession
-from sqlalchemy import and_
 from datetime import datetime, timedelta
 import uuid
 from src.domain.entities.session import Session
@@ -16,9 +15,7 @@ class SessionRepositoryImpl(SessionRepository):
             user_id=session.user_id,
             company_id=session.company_id,
             disability_type=session.disability_type,
-            cognitive_analysis_enabled=session.cognitive_analysis_enabled,
-            status=session.status,
-            current_activity=session.current_activity
+            cognitive_analysis_enabled=session.cognitive_analysis_enabled
         )
         self.db.add(db_session)
         self.db.commit()
@@ -36,34 +33,27 @@ class SessionRepositoryImpl(SessionRepository):
             SessionModel.id == session.id
         ).first()
         if db_session:
-            db_session.status = session.status
-            db_session.current_activity = session.current_activity
-            db_session.last_heartbeat_at = session.last_heartbeat_at
             db_session.ended_at = session.ended_at
             self.db.commit()
             self.db.refresh(db_session)
             return self._to_domain(db_session)
         return session
 
-    def get_sessions_without_heartbeat(self, seconds: int) -> List[Session]:
-        threshold = datetime.utcnow() - timedelta(seconds=seconds)
+    def get_by_user_id(self, user_id: int) -> List[Session]:
         db_sessions = self.db.query(SessionModel).filter(
-            and_(
-                SessionModel.status == "activa",
-                SessionModel.last_heartbeat_at < threshold
-            )
+            SessionModel.user_id == user_id,
+            SessionModel.ended_at.is_(None)
         ).all()
         return [self._to_domain(s) for s in db_sessions]
 
-    def get_inactive_sessions(self, hours: int) -> List[Session]:
+    def delete_old_sessions(self, hours: int) -> int:
         threshold = datetime.utcnow() - timedelta(hours=hours)
-        db_sessions = self.db.query(SessionModel).filter(
-            and_(
-                SessionModel.status.in_(["pausada", "pausada_automaticamente"]),
-                SessionModel.last_heartbeat_at < threshold
-            )
-        ).all()
-        return [self._to_domain(s) for s in db_sessions]
+        result = self.db.query(SessionModel).filter(
+            SessionModel.created_at < threshold,
+            SessionModel.ended_at.is_(None)
+        ).delete()
+        self.db.commit()
+        return result
 
     @staticmethod
     def _to_domain(db_session: SessionModel) -> Session:
@@ -73,9 +63,6 @@ class SessionRepositoryImpl(SessionRepository):
             company_id=db_session.company_id,
             disability_type=db_session.disability_type,
             cognitive_analysis_enabled=db_session.cognitive_analysis_enabled,
-            status=db_session.status,
-            current_activity=db_session.current_activity,
             created_at=db_session.created_at,
-            last_heartbeat_at=db_session.last_heartbeat_at,
             ended_at=db_session.ended_at
         )

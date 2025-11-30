@@ -11,6 +11,7 @@ class ActivityLogRepositoryImpl(ActivityLogRepository):
 
     def create(self, activity_log: ActivityLog) -> ActivityLog:
         db_activity = ActivityLogModel(
+            activity_uuid=activity_log.activity_uuid,
             session_id=activity_log.session_id,
             external_activity_id=activity_log.external_activity_id,
             status=activity_log.status,
@@ -21,18 +22,33 @@ class ActivityLogRepositoryImpl(ActivityLogRepository):
         self.db.refresh(db_activity)
         return self._to_domain(db_activity)
 
+    def get_by_uuid(self, activity_uuid: str) -> Optional[ActivityLog]:
+        db_activity = self.db.query(ActivityLogModel).filter(
+            ActivityLogModel.activity_uuid == uuid.UUID(activity_uuid)
+        ).first()
+        return self._to_domain(db_activity) if db_activity else None
+
     def get_by_session_id(self, session_id: str) -> List[ActivityLog]:
         db_activities = self.db.query(ActivityLogModel).filter(
             ActivityLogModel.session_id == uuid.UUID(session_id)
         ).all()
         return [self._to_domain(a) for a in db_activities]
 
+    def get_in_progress_by_session(self, session_id: str) -> Optional[ActivityLog]:
+        db_activity = self.db.query(ActivityLogModel).filter(
+            ActivityLogModel.session_id == uuid.UUID(session_id),
+            ActivityLogModel.status == "en_progreso"
+        ).first()
+        return self._to_domain(db_activity) if db_activity else None
+
     def update(self, activity_log: ActivityLog) -> ActivityLog:
         db_activity = self.db.query(ActivityLogModel).filter(
-            ActivityLogModel.id == activity_log.id
+            ActivityLogModel.activity_uuid == activity_log.activity_uuid
         ).first()
         if db_activity:
             db_activity.status = activity_log.status
+            db_activity.paused_at = activity_log.paused_at
+            db_activity.resumed_at = activity_log.resumed_at
             db_activity.completed_at = activity_log.completed_at
             db_activity.feedback_data = activity_log.feedback_data
             self.db.commit()
@@ -44,10 +60,13 @@ class ActivityLogRepositoryImpl(ActivityLogRepository):
     def _to_domain(db_activity: ActivityLogModel) -> ActivityLog:
         return ActivityLog(
             id=db_activity.id,
+            activity_uuid=db_activity.activity_uuid,
             session_id=db_activity.session_id,
             external_activity_id=db_activity.external_activity_id,
             status=db_activity.status,
             started_at=db_activity.started_at,
+            paused_at=db_activity.paused_at,
+            resumed_at=db_activity.resumed_at,
             completed_at=db_activity.completed_at,
             feedback_data=db_activity.feedback_data
         )

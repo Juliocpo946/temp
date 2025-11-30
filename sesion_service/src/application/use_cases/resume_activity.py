@@ -3,7 +3,7 @@ from src.infrastructure.messaging.rabbitmq_client import RabbitMQClient
 from src.infrastructure.messaging.activity_event_publisher import ActivityEventPublisher
 from src.infrastructure.config.settings import LOG_SERVICE_QUEUE
 
-class AbandonActivityUseCase:
+class ResumeActivityUseCase:
     def __init__(
         self,
         activity_log_repo: ActivityLogRepository,
@@ -19,24 +19,24 @@ class AbandonActivityUseCase:
             self._publish_log(f"Actividad no encontrada: {activity_uuid}", "error")
             raise ValueError("Actividad no encontrada")
 
-        if activity.status not in ["en_progreso", "pausada"]:
-            self._publish_log(f"Actividad no puede abandonarse: {activity_uuid} (estado: {activity.status})", "error")
-            raise ValueError(f"La actividad no puede abandonarse, estado actual: {activity.status}")
+        if activity.status != "pausada":
+            self._publish_log(f"Actividad no esta pausada: {activity_uuid} (estado: {activity.status})", "error")
+            raise ValueError(f"La actividad no esta pausada, estado actual: {activity.status}")
 
-        activity.abandon()
+        activity.resume()
         self.activity_log_repo.update(activity)
 
-        self.event_publisher.publish_activity_abandoned(
+        self.event_publisher.publish_activity_resumed(
             activity_uuid,
             str(activity.session_id)
         )
 
-        self._publish_log(f"Actividad abandonada: {activity_uuid}")
+        self._publish_log(f"Actividad reanudada: {activity_uuid}")
 
         return {
-            'status': 'abandonada',
+            'status': 'en_progreso',
             'activity_uuid': activity_uuid,
-            'completed_at': activity.completed_at.isoformat()
+            'resumed_at': activity.resumed_at.isoformat()
         }
 
     def _publish_log(self, message: str, level: str = "info") -> None:

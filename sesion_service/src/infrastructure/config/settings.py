@@ -15,3 +15,6 @@ AMQP_URL = os.getenv("AMQP_URL")
 SERVICE_NAME = os.getenv("SERVICE_NAME", "session-service")
 SERVICE_PORT = int(os.getenv("SERVICE_PORT", 3004))
 LOG_SERVICE_QUEUE = os.getenv("LOG_SERVICE_QUEUE", "logs")
+
+ACTIVITY_EVENTS_QUEUE = os.getenv("ACTIVITY_EVENTS_QUEUE", "activity_events")
+MONITORING_WEBSOCKET_EVENTS_QUEUE = os.getenv("MONITORING_WEBSOCKET_EVENTS_QUEUE", "monitoring_websocket_events")

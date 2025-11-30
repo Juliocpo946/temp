@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Boolean, DateTime, Uuid, Integer, JSON
+from sqlalchemy import Column, String, Boolean, DateTime, Uuid, Integer
 from datetime import datetime
 import uuid
 from src.infrastructure.persistence.database import Base
@@ -11,8 +11,5 @@ class SessionModel(Base):
     company_id = Column(Uuid, nullable=False)
     disability_type = Column(String(100), nullable=False)
     cognitive_analysis_enabled = Column(Boolean, default=True)
-    status = Column(String(50), nullable=False)
-    current_activity = Column(JSON, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
-    last_heartbeat_at = Column(DateTime, default=datetime.utcnow)
     ended_at = Column(DateTime, nullable=True)

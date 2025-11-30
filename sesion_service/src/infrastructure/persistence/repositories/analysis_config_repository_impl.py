@@ -31,7 +31,7 @@ class AnalysisConfigRepositoryImpl(AnalysisConfigRepository):
 
     def update(self, config: AnalysisConfig) -> AnalysisConfig:
         db_config = self.db.query(AnalysisConfigModel).filter(
-            AnalysisConfigModel.id == config.id
+            AnalysisConfigModel.session_id == config.session_id
         ).first()
         if db_config:
             db_config.cognitive_analysis_enabled = config.cognitive_analysis_enabled

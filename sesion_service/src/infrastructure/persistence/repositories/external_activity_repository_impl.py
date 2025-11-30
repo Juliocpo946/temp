@@ -27,7 +27,14 @@ class ExternalActivityRepositoryImpl(ExternalActivityRepository):
         ).first()
         return self._to_domain(db_activity) if db_activity else None
 
-    def get_or_create(self, external_activity_id: int, title: str, subtitle: Optional[str], content: Optional[str], activity_type: str) -> ExternalActivity:
+    def get_or_create(
+        self,
+        external_activity_id: int,
+        title: str,
+        subtitle: Optional[str],
+        content: Optional[str],
+        activity_type: str
+    ) -> ExternalActivity:
         existing = self.get_by_external_id(external_activity_id)
         if existing:
             return existing

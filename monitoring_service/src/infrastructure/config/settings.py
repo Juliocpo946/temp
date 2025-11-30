@@ -15,8 +15,10 @@ MYSQL_DATABASE = os.getenv("MYSQL_DATABASE", "monitoring_service")
 AMQP_URL = os.getenv("AMQP_URL")
 MONITORING_EVENTS_QUEUE = os.getenv("MONITORING_EVENTS_QUEUE", "monitoring_events")
 LOG_SERVICE_QUEUE = os.getenv("LOG_SERVICE_QUEUE", "logs")
+ACTIVITY_EVENTS_QUEUE = os.getenv("ACTIVITY_EVENTS_QUEUE", "activity_events")
+MONITORING_WEBSOCKET_EVENTS_QUEUE = os.getenv("MONITORING_WEBSOCKET_EVENTS_QUEUE", "monitoring_websocket_events")
 
-MODEL_PATH = os.getenv("MODEL_PATH", "models/intervention_model.h5")
+MODEL_PATH = os.getenv("MODEL_PATH", "models/intervention_model.keras")
 SEQUENCE_LENGTH = int(os.getenv("SEQUENCE_LENGTH", 30))
 CONFIDENCE_THRESHOLD = float(os.getenv("CONFIDENCE_THRESHOLD", 0.6))
 

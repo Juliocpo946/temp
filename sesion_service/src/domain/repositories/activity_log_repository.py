@@ -8,7 +8,15 @@ class ActivityLogRepository(ABC):
         pass
 
     @abstractmethod
+    def get_by_uuid(self, activity_uuid: str) -> Optional[ActivityLog]:
+        pass
+
+    @abstractmethod
     def get_by_session_id(self, session_id: str) -> List[ActivityLog]:
+        pass
+
+    @abstractmethod
+    def get_in_progress_by_session(self, session_id: str) -> Optional[ActivityLog]:
         pass
 
     @abstractmethod

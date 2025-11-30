@@ -16,9 +16,9 @@ class RabbitMQClient:
             parameters.blocked_connection_timeout = 300
             self.connection = pika.BlockingConnection(parameters)
             self.channel = self.connection.channel()
-            print(f"Conectado a RabbitMQ")
+            print(f"[INFO] Conectado a RabbitMQ")
         except Exception as e:
-            print(f"Error al conectar con RabbitMQ: {str(e)}")
+            print(f"[ERROR] Error al conectar con RabbitMQ: {str(e)}")
             raise
 
     def declare_queue(self, queue_name: str) -> None:
@@ -26,7 +26,7 @@ class RabbitMQClient:
             self.connect()
         self.channel.queue_declare(queue=queue_name, durable=True)
 
-    def publish(self, queue_name: str, message: dict) -> None:
+    def publish(self, queue_name: str, message: Dict[str, Any]) -> bool:
         max_retries = 3
         retry_count = 0
         
@@ -42,17 +42,18 @@ class RabbitMQClient:
                     body=json.dumps(message),
                     properties=pika.BasicProperties(delivery_mode=2)
                 )
-                return
+                return True
             except Exception as e:
                 retry_count += 1
-                print(f"Error al publicar mensaje en RabbitMQ (intento {retry_count}/{max_retries}): {str(e)}")
+                print(f"[ERROR] Error al publicar mensaje en RabbitMQ (intento {retry_count}/{max_retries}): {str(e)}")
                 if retry_count < max_retries:
                     try:
                         self.connect()
                     except:
                         pass
                 else:
-                    raise
+                    return False
+        return False
 
     def consume(self, queue_name: str, callback: Callable) -> None:
         try:
@@ -61,16 +62,16 @@ class RabbitMQClient:
                 
             self.declare_queue(queue_name)
             self.channel.basic_consume(queue=queue_name, on_message_callback=callback, auto_ack=False)
-            print(f"Escuchando en cola: {queue_name}")
+            print(f"[INFO] Escuchando en cola: {queue_name}")
             self.channel.start_consuming()
         except Exception as e:
-            print(f"Error al consumir de RabbitMQ: {str(e)}")
+            print(f"[ERROR] Error al consumir de RabbitMQ: {str(e)}")
             raise
 
     def close(self) -> None:
         try:
             if self.connection and not self.connection.is_closed:
                 self.connection.close()
-                print(f"Desconectado de RabbitMQ")
+                print(f"[INFO] Desconectado de RabbitMQ")
         except Exception as e:
-            print(f"Error al cerrar conexión RabbitMQ: {str(e)}")
+            print(f"[ERROR] Error al cerrar conexion RabbitMQ: {str(e)}")
