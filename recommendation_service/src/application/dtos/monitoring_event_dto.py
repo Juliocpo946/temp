@@ -1,45 +1,39 @@
-from datetime import datetime
-from typing import Optional
+from typing import Dict, Any, Optional
+
 
 class MonitoringEventDTO:
     def __init__(
         self,
         session_id: str,
         user_id: int,
-        company_id: str,
-        timestamp: int,
+        activity_uuid: str,
         evento_cognitivo: str,
+        accion_sugerida: str,
         precision_cognitiva: float,
         confianza: float,
-        tiempo_en_actividad: int,
-        activity_type: str,
-        external_activity_id: int,
-        intentos_fallidos: Optional[int] = None
+        contexto: Dict[str, Any],
+        timestamp: int
     ):
         self.session_id = session_id
         self.user_id = user_id
-        self.company_id = company_id
-        self.timestamp = timestamp
+        self.activity_uuid = activity_uuid
         self.evento_cognitivo = evento_cognitivo
+        self.accion_sugerida = accion_sugerida
         self.precision_cognitiva = precision_cognitiva
         self.confianza = confianza
-        self.tiempo_en_actividad = tiempo_en_actividad
-        self.activity_type = activity_type
-        self.external_activity_id = external_activity_id
-        self.intentos_fallidos = intentos_fallidos
+        self.contexto = contexto
+        self.timestamp = timestamp
 
     @staticmethod
     def from_dict(data: dict) -> 'MonitoringEventDTO':
         return MonitoringEventDTO(
             session_id=data.get('session_id'),
             user_id=data.get('user_id'),
-            company_id=data.get('company_id'),
-            timestamp=data.get('timestamp'),
+            activity_uuid=data.get('activity_uuid'),
             evento_cognitivo=data.get('evento_cognitivo'),
-            precision_cognitiva=data.get('precision_cognitiva'),
-            confianza=data.get('confianza'),
-            tiempo_en_actividad=data.get('tiempo_en_actividad'),
-            activity_type=data.get('activity_type'),
-            external_activity_id=data.get('external_activity_id'),
-            intentos_fallidos=data.get('intentos_fallidos')
+            accion_sugerida=data.get('accion_sugerida'),
+            precision_cognitiva=data.get('precision_cognitiva', 0.0),
+            confianza=data.get('confianza', 0.0),
+            contexto=data.get('contexto', {}),
+            timestamp=data.get('timestamp', 0)
         )

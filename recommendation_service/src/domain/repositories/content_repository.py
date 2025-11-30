@@ -1,25 +1,42 @@
 from abc import ABC, abstractmethod
-from typing import Optional
+from typing import Optional, List
+from src.domain.entities.content import Content
+
 
 class ContentRepository(ABC):
     @abstractmethod
-    async def search_specific(
-        self,
-        recommendation_type: str,
-        title: str,
-        subtitle: str,
-        activity_type: str,
-        precision_range: tuple,
-        evento: str
-    ) -> Optional[dict]:
+    def save(self, content: Content) -> Content:
         pass
 
     @abstractmethod
-    async def search_generic(
+    def get_by_id(self, content_id: int) -> Optional[Content]:
+        pass
+
+    @abstractmethod
+    def find_by_criteria(
         self,
-        recommendation_type: str,
-        activity_type: str,
-        precision_range: tuple,
-        evento: str
-    ) -> Optional[dict]:
+        tema: str,
+        tipo_intervencion: str,
+        subtema: Optional[str] = None,
+        tipo_actividad: Optional[str] = None
+    ) -> Optional[Content]:
+        pass
+
+    @abstractmethod
+    def list_all(
+        self,
+        tema: Optional[str] = None,
+        subtema: Optional[str] = None,
+        tipo_actividad: Optional[str] = None,
+        tipo_intervencion: Optional[str] = None,
+        activo: Optional[bool] = None
+    ) -> List[Content]:
+        pass
+
+    @abstractmethod
+    def update(self, content: Content) -> Content:
+        pass
+
+    @abstractmethod
+    def delete(self, content_id: int) -> bool:
         pass

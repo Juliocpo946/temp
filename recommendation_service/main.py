@@ -1,35 +1,34 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from src.infrastructure.config.settings import SERVICE_PORT
-from src.infrastructure.messaging.recommendation_consumer import RecommendationConsumer
-from src.presentation.routes.health_routes import router
+from src.infrastructure.persistence.database import create_tables
+from src.infrastructure.messaging.intervention_consumer import InterventionConsumer
+from src.presentation.routes.health_routes import router as health_router
+from src.presentation.routes.content_routes import router as content_router
 
-recommendation_consumer = None
+intervention_consumer = None
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global recommendation_consumer
-    recommendation_consumer = RecommendationConsumer()
-    recommendation_consumer.start()
-    print("[INFO] Recommendation Service iniciado y escuchando eventos de monitoreo")
+    global intervention_consumer
+    create_tables()
+    intervention_consumer = InterventionConsumer()
+    intervention_consumer.start()
     yield
-    if recommendation_consumer:
-        recommendation_consumer.rabbitmq_client.close()
+    if intervention_consumer:
+        intervention_consumer.close()
+
 
 app = FastAPI(
     title="Recommendation Service",
-    version="1.0.0",
-    lifespan=lifespan,
-    docs_url=None,
-    redoc_url=None,
-    openapi_url=None
+    version="2.0.0",
+    lifespan=lifespan
 )
 
-app.include_router(router)
+app.include_router(health_router)
+app.include_router(content_router, prefix="/contents", tags=["Contents"])
 
-@app.get("/health")
-def health_check():
-    return {"status": "ok", "service": "recommendation-service"}
 
 if __name__ == "__main__":
     import uvicorn
