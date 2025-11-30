@@ -1,7 +1,14 @@
 from typing import Dict, Optional
+from dataclasses import dataclass, field
 from fastapi import WebSocket
 from src.infrastructure.ml.sequence_buffer import SequenceBuffer
 from src.domain.services.intervention_controller import SessionContext
+
+@dataclass
+class ActivityMetadata:
+    user_id: int
+    external_activity_id: int
+    company_id: Optional[str] = None
 
 class ConnectionState:
     def __init__(self, websocket: WebSocket, session_id: str, activity_uuid: str):
@@ -10,6 +17,17 @@ class ConnectionState:
         self.activity_uuid = activity_uuid
         self.buffer = SequenceBuffer()
         self.context = SessionContext()
+        self.metadata: Optional[ActivityMetadata] = None
+        self.is_ready = False
+
+    def set_metadata(self, user_id: int, external_activity_id: int, company_id: Optional[str] = None) -> None:
+        self.metadata = ActivityMetadata(
+            user_id=user_id,
+            external_activity_id=external_activity_id,
+            company_id=company_id
+        )
+        self.is_ready = True
+        self.context.reset_for_activity(external_activity_id)
 
 class ConnectionManager:
     def __init__(self):

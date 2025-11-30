@@ -7,6 +7,7 @@ class Intervention:
         self,
         id: Optional[uuid.UUID],
         session_id: uuid.UUID,
+        activity_uuid: uuid.UUID,
         external_activity_id: int,
         intervention_type: str,
         confidence: float,
@@ -18,6 +19,7 @@ class Intervention:
     ):
         self.id = id or uuid.uuid4()
         self.session_id = session_id
+        self.activity_uuid = activity_uuid
         self.external_activity_id = external_activity_id
         self.intervention_type = intervention_type
         self.confidence = confidence

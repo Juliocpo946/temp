@@ -53,9 +53,12 @@ def get_connections():
         "active_connections": manager.connection_count,
         "activities": [
             {
-                "activity_uuid": uuid,
-                "session_id": state.session_id
+                "activity_uuid": activity_uuid,
+                "session_id": state.session_id,
+                "is_ready": state.is_ready,
+                "user_id": state.metadata.user_id if state.metadata else None,
+                "external_activity_id": state.metadata.external_activity_id if state.metadata else None
             }
-            for uuid, state in connections.items()
+            for activity_uuid, state in connections.items()
         ]
     }

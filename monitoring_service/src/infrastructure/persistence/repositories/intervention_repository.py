@@ -13,6 +13,7 @@ class InterventionRepository:
         db_intervention = InterventionModel(
             id=str(intervention.id),
             session_id=str(intervention.session_id),
+            activity_uuid=str(intervention.activity_uuid),
             external_activity_id=str(intervention.external_activity_id),
             intervention_type=intervention.intervention_type,
             confidence=intervention.confidence,
@@ -32,6 +33,12 @@ class InterventionRepository:
             InterventionModel.id == intervention_id
         ).first()
         return self._to_domain(db_intervention) if db_intervention else None
+
+    def get_by_activity_uuid(self, activity_uuid: str) -> List[Intervention]:
+        db_interventions = self.db.query(InterventionModel).filter(
+            InterventionModel.activity_uuid == activity_uuid
+        ).order_by(InterventionModel.triggered_at.desc()).all()
+        return [self._to_domain(i) for i in db_interventions]
 
     def get_pending_evaluations(self, before: datetime) -> List[Intervention]:
         db_interventions = self.db.query(InterventionModel).filter(
@@ -57,6 +64,7 @@ class InterventionRepository:
         return Intervention(
             id=uuid.UUID(db_intervention.id),
             session_id=uuid.UUID(db_intervention.session_id),
+            activity_uuid=uuid.UUID(db_intervention.activity_uuid),
             external_activity_id=int(db_intervention.external_activity_id),
             intervention_type=db_intervention.intervention_type,
             confidence=db_intervention.confidence,

@@ -1,13 +1,14 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
-from src.infrastructure.config.settings import SERVICE_PORT, AUTH_SERVICE_URL, LOG_SERVICE_URL
+from src.infrastructure.config.settings import SERVICE_PORT, AUTH_SERVICE_URL, LOG_SERVICE_URL, MONITORING_SERVICE_URL
 from src.infrastructure.http.http_client import HTTPClient
 from src.infrastructure.messaging.rabbitmq_client import RabbitMQClient
 from src.infrastructure.cache.redis_client import RedisClient
 from src.infrastructure.messaging.cache_invalidation_consumer import CacheInvalidationConsumer
 from src.presentation.middleware.gateway_middleware import GatewayMiddleware
 from src.presentation.routes.gateway_routes import router
+from src.presentation.routes.websocket_routes import router as ws_router
 
 http_client = HTTPClient()
 rabbitmq_client = RabbitMQClient()
@@ -36,6 +37,8 @@ app = FastAPI(
 )
 
 app.add_middleware(GatewayMiddleware, http_client=http_client, rabbitmq_client=rabbitmq_client, redis_client=redis_client)
+
+app.include_router(ws_router)
 app.include_router(router)
 
 @app.get("/health")
@@ -44,22 +47,37 @@ async def health_check():
 
 @app.get("/health/services")
 async def health_check_services():
+    services_status = {}
+    
     try:
         auth_response = await http_client.get(f"{AUTH_SERVICE_URL}/health")
-        log_response = await http_client.get(f"{LOG_SERVICE_URL}/health")
-        
-        return {
-            "status": "ok",
-            "services": {
-                "auth-service": auth_response,
-                "log-service": log_response
-            }
-        }
+        services_status["auth-service"] = auth_response
     except Exception as e:
-        return JSONResponse(
-            status_code=500,
-            content={"status": "error", "message": str(e)}
-        )
+        services_status["auth-service"] = {"status": "error", "message": str(e)}
+    
+    try:
+        log_response = await http_client.get(f"{LOG_SERVICE_URL}/health")
+        services_status["log-service"] = log_response
+    except Exception as e:
+        services_status["log-service"] = {"status": "error", "message": str(e)}
+    
+    if MONITORING_SERVICE_URL:
+        try:
+            monitoring_response = await http_client.get(f"{MONITORING_SERVICE_URL}/health")
+            services_status["monitoring-service"] = monitoring_response
+        except Exception as e:
+            services_status["monitoring-service"] = {"status": "error", "message": str(e)}
+    
+    all_ok = all(
+        s.get("status") == "ok" 
+        for s in services_status.values() 
+        if isinstance(s, dict)
+    )
+    
+    return {
+        "status": "ok" if all_ok else "degraded",
+        "services": services_status
+    }
 
 if __name__ == "__main__":
     import uvicorn

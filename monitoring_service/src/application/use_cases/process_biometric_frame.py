@@ -22,11 +22,19 @@ class ProcessBiometricFrameUseCase:
         self,
         db: DBSession,
         buffer: SequenceBuffer,
-        context: SessionContext
+        context: SessionContext,
+        activity_uuid: str,
+        session_id: str,
+        user_id: int,
+        external_activity_id: int
     ):
         self.db = db
         self.buffer = buffer
         self.context = context
+        self.activity_uuid = activity_uuid
+        self.session_id = session_id
+        self.user_id = user_id
+        self.external_activity_id = external_activity_id
         self.feature_extractor = FeatureExtractor()
         self.classifier = InterventionClassifier()
         self.controller = InterventionController()
@@ -35,12 +43,8 @@ class ProcessBiometricFrameUseCase:
         self.training_sample_repo = TrainingSampleRepository(db)
 
     def execute(self, frame: BiometricFrameDTO) -> Optional[Dict[str, Any]]:
-        if self._activity_changed(frame.external_activity_id):
-            self.buffer.clear()
-            self.context.reset_for_activity(frame.external_activity_id)
-
         features = self.feature_extractor.extract(frame)
-        raw_frame = self._frame_to_dict(frame)
+        raw_frame = frame.to_dict()
         self.buffer.add(features, raw_frame)
 
         if not self.buffer.is_ready():
@@ -52,7 +56,7 @@ class ProcessBiometricFrameUseCase:
         intervention_type, confidence = self.classifier.classify(sequence, context_vector)
 
         if not self.classifier.should_intervene(intervention_type, confidence):
-            self._maybe_save_negative_sample(frame, sequence, context_vector)
+            self._maybe_save_negative_sample(sequence, context_vector)
             return None
 
         if not self.controller.can_intervene(intervention_type, self.context):
@@ -65,9 +69,10 @@ class ProcessBiometricFrameUseCase:
         self.context.register_intervention(intervention_type)
 
         event = MonitoringEventDTO(
-            session_id=frame.session_id,
-            user_id=frame.user_id,
-            external_activity_id=frame.external_activity_id,
+            session_id=self.session_id,
+            user_id=self.user_id,
+            external_activity_id=self.external_activity_id,
+            activity_uuid=self.activity_uuid,
             intervention_type=intervention_type.to_string(),
             confidence=confidence,
             context={
@@ -86,21 +91,6 @@ class ProcessBiometricFrameUseCase:
             "confidence": confidence
         }
 
-    def _activity_changed(self, external_activity_id: int) -> bool:
-        if self.context.current_external_activity_id is None:
-            return True
-        return self.context.current_external_activity_id != external_activity_id
-
-    def _frame_to_dict(self, frame: BiometricFrameDTO) -> Dict[str, Any]:
-        return {
-            "timestamp": frame.timestamp,
-            "emocion_principal": frame.emocion_principal,
-            "desglose_emociones": frame.desglose_emociones,
-            "atencion": frame.atencion,
-            "somnolencia": frame.somnolencia,
-            "rostro_detectado": frame.rostro_detectado
-        }
-
     def _create_intervention(
         self,
         frame: BiometricFrameDTO,
@@ -111,8 +101,9 @@ class ProcessBiometricFrameUseCase:
     ) -> Intervention:
         intervention = Intervention(
             id=None,
-            session_id=uuid.UUID(frame.session_id),
-            external_activity_id=frame.external_activity_id,
+            session_id=uuid.UUID(self.session_id),
+            activity_uuid=uuid.UUID(self.activity_uuid),
+            external_activity_id=self.external_activity_id,
             intervention_type=intervention_type.to_string(),
             confidence=confidence,
             triggered_at=datetime.utcnow(),
@@ -125,7 +116,7 @@ class ProcessBiometricFrameUseCase:
         training_sample = TrainingSample(
             id=None,
             intervention_id=saved_intervention.id,
-            external_activity_id=frame.external_activity_id,
+            external_activity_id=self.external_activity_id,
             window_data={"sequence": sequence.tolist()},
             context_data={"context": context_vector.tolist()},
             label=intervention_type.value,
@@ -135,17 +126,12 @@ class ProcessBiometricFrameUseCase:
 
         return saved_intervention
 
-    def _maybe_save_negative_sample(
-        self,
-        frame: BiometricFrameDTO,
-        sequence,
-        context_vector
-    ) -> None:
+    def _maybe_save_negative_sample(self, sequence, context_vector) -> None:
         if random.random() < NEGATIVE_SAMPLE_RATE:
             training_sample = TrainingSample(
                 id=None,
                 intervention_id=None,
-                external_activity_id=frame.external_activity_id,
+                external_activity_id=self.external_activity_id,
                 window_data={"sequence": sequence.tolist()},
                 context_data={"context": context_vector.tolist()},
                 label=0,
