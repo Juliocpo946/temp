@@ -13,6 +13,7 @@ from src.application.use_cases.generate_new_api_key import GenerateNewApiKeyUseC
 from src.application.use_cases.request_revoke_api_key import RequestRevokeApiKeyUseCase
 from src.application.use_cases.confirm_revoke_api_key import ConfirmRevokeApiKeyUseCase
 from src.presentation.schemas.application_schema import ApplicationCreateSchema, ApiKeyResponseSchema, ConfirmRevokeSchema
+from src.application.use_cases.get_application_api_keys import GetApplicationApiKeysUseCase
 import traceback
 
 router = APIRouter()
@@ -126,6 +127,25 @@ async def confirm_revoke_api_key(api_key_id: str, confirm_data: ConfirmRevokeSch
         return result
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as e:
+        print(f"Error detallado: {traceback.format_exc()}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+@router.get("/{application_id}/api-keys")
+async def get_application_api_keys(
+    application_id: str,
+    db: Session = Depends(get_db),
+    x_company_id: str = Header(None, alias="X-Company-ID")
+):
+    try:
+        # Validación básica de seguridad
+        if not x_company_id:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Company ID requerido")
+
+        api_key_repo = ApiKeyRepositoryImpl(db)
+        use_case = GetApplicationApiKeysUseCase(api_key_repo)
+        result = use_case.execute(application_id)
+        return result
     except Exception as e:
         print(f"Error detallado: {traceback.format_exc()}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))

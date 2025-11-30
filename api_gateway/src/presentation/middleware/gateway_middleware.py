@@ -37,7 +37,9 @@ class GatewayMiddleware(BaseHTTPMiddleware):
             '/auth/companies/',
             '/auth/api-keys/by-key-value'
         ]
-        
+        if request.method == "OPTIONS":
+            return await call_next(request)
+
         if request.url.path in public_paths or any(request.url.path.startswith(p) for p in public_paths):
             response = await call_next(request)
             return response

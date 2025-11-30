@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from src.infrastructure.config.settings import SERVICE_PORT, AUTH_SERVICE_URL, LOG_SERVICE_URL
 from src.infrastructure.http.http_client import HTTPClient
@@ -36,6 +37,15 @@ app = FastAPI(
 )
 
 app.add_middleware(GatewayMiddleware, http_client=http_client, rabbitmq_client=rabbitmq_client, redis_client=redis_client)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], # cambiar a dominio
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 app.include_router(router)
 
 @app.get("/health")
