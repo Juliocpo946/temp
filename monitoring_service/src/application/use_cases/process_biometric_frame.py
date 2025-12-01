@@ -17,6 +17,7 @@ from src.infrastructure.persistence.repositories.intervention_repository import 
 from src.infrastructure.persistence.repositories.training_sample_repository import TrainingSampleRepository
 from src.infrastructure.config.settings import NEGATIVE_SAMPLE_RATE
 
+
 class ProcessBiometricFrameUseCase:
     def __init__(
         self,
@@ -42,7 +43,7 @@ class ProcessBiometricFrameUseCase:
         self.intervention_repo = InterventionRepository(db)
         self.training_sample_repo = TrainingSampleRepository(db)
 
-    def execute(self, frame: BiometricFrameDTO) -> Optional[Dict[str, Any]]:
+    def execute(self, frame: BiometricFrameDTO) -> None:
         features = self.feature_extractor.extract(frame)
         raw_frame = frame.to_dict()
         self.buffer.add(features, raw_frame)
@@ -85,11 +86,7 @@ class ProcessBiometricFrameUseCase:
 
         self.publisher.publish_intervention(event)
 
-        return {
-            "intervention_id": str(intervention.id),
-            "type": intervention_type.to_string(),
-            "confidence": confidence
-        }
+        return None
 
     def _create_intervention(
         self,

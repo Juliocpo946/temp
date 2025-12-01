@@ -5,61 +5,72 @@ from src.application.dtos.recommendation_dto import RecommendationDTO
 from src.application.dtos.activity_details_dto import ActivityDetailsResponseDTO
 from src.domain.repositories.content_repository import ContentRepository
 from src.infrastructure.messaging.activity_details_client import ActivityDetailsClient
+from src.infrastructure.messaging.session_config_client import SessionConfigClient
 from src.infrastructure.http.gemini_client import GeminiClient
 from src.infrastructure.cache.redis_client import RedisClient
 
 
 class ProcessInterventionUseCase:
+    PAUSE_MESSAGES = {
+        "frustracion": "Pausar. Respirar. Regresar mejor 🧘",
+        "desatencion": "Descanso corto. Regresar enfocado 💪",
+        "cansancio_cognitivo": "Mente cansada. Pausa 10 minutos 😴"
+    }
+
+    INSTRUCTION_FALLBACK = {
+        "frustracion": "Paso a paso. Leer despacio, entender mejor 📖",
+        "desatencion": "Concentrar actividad. Tu puedes lograrlo 🎯",
+        "cansancio_cognitivo": "Descanso breve. Continuar despues 💪"
+    }
+
     def __init__(
         self,
         content_repository: ContentRepository,
         activity_details_client: ActivityDetailsClient,
+        session_config_client: SessionConfigClient,
         gemini_client: GeminiClient,
         redis_client: Optional[RedisClient] = None
     ):
         self.content_repository = content_repository
         self.activity_details_client = activity_details_client
+        self.session_config_client = session_config_client
         self.gemini_client = gemini_client
         self.redis_client = redis_client
 
     def execute(self, event: MonitoringEventDTO) -> Optional[Dict[str, Any]]:
-        activity_details = self.activity_details_client.get_activity_details(
-            event.activity_uuid
-        )
+        config = self.session_config_client.get_session_config(event.session_id)
 
-        if not activity_details:
-            print(f"[PROCESS_INTERVENTION] [ERROR] No se pudieron obtener detalles de actividad: {event.activity_uuid}")
-            return self._create_default_recommendation(event)
+        if not self._is_intervention_allowed(event.suggested_action, config):
+            print(f"[PROCESS_INTERVENTION] [INFO] Intervencion {event.suggested_action} desactivada por config")
+            return None
 
-        content = self._find_content(
-            topic=activity_details.title,
-            subtopic=activity_details.subtitle,
-            activity_type=activity_details.activity_type,
-            intervention_type=event.suggested_action
-        )
+        if event.suggested_action == "vibration":
+            return self._create_vibration_recommendation(event)
 
-        if not content:
-            content = self.gemini_client.generate_content(
-                intervention_type=event.suggested_action,
-                topic=activity_details.title,
-                subtopic=activity_details.subtitle,
-                activity_type=activity_details.activity_type,
-                title=activity_details.title,
-                objective=activity_details.content,
-                cognitive_event=event.cognitive_event,
-                precision=event.cognitive_precision
-            )
+        if event.suggested_action == "pause":
+            return self._create_pause_recommendation(event)
 
-        if not content:
-            print(f"[PROCESS_INTERVENTION] [WARNING] No se pudo generar contenido, usando por defecto")
-            content = self._get_default_content(event.suggested_action, event.cognitive_event)
+        if event.suggested_action == "instruction":
+            return self._create_instruction_recommendation(event, config)
 
+        return None
+
+    def _is_intervention_allowed(self, intervention_type: str, config: Dict[str, Any]) -> bool:
+        if intervention_type == "vibration":
+            return config.get("vibration_alerts", True)
+        elif intervention_type == "instruction":
+            return config.get("text_notifications", True) or config.get("video_suggestions", True)
+        elif intervention_type == "pause":
+            return config.get("pause_suggestions", True)
+        return True
+
+    def _create_vibration_recommendation(self, event: MonitoringEventDTO) -> Dict[str, Any]:
         recommendation = RecommendationDTO(
             session_id=event.session_id,
             user_id=event.user_id,
-            action=event.suggested_action,
-            content={"type": "text", "body": content},
-            vibration=self._get_vibration_config(event.suggested_action),
+            action="vibration",
+            content=None,
+            vibration={"enabled": True, "duration_ms": 200, "intensity": "medium"},
             metadata={
                 "cognitive_event": event.cognitive_event,
                 "cognitive_precision": event.cognitive_precision,
@@ -69,89 +80,145 @@ class ProcessInterventionUseCase:
             timestamp=int(datetime.utcnow().timestamp() * 1000)
         )
 
-        print(f"[PROCESS_INTERVENTION] [INFO] Recomendacion generada para sesion: {event.session_id}")
+        print(f"[PROCESS_INTERVENTION] [INFO] Vibracion enviada para sesion: {event.session_id}")
         return recommendation.to_dict()
 
-    def _create_default_recommendation(self, event: MonitoringEventDTO) -> Dict[str, Any]:
-        content = self._get_default_content(event.suggested_action, event.cognitive_event)
+    def _create_pause_recommendation(self, event: MonitoringEventDTO) -> Dict[str, Any]:
+        pause_message = self.PAUSE_MESSAGES.get(
+            event.cognitive_event,
+            "Descanso necesario. Pausa breve 🧘"
+        )
 
         recommendation = RecommendationDTO(
             session_id=event.session_id,
             user_id=event.user_id,
-            action=event.suggested_action,
-            content={"type": "text", "body": content},
-            vibration=self._get_vibration_config(event.suggested_action),
+            action="pause",
+            content={
+                "type": "text",
+                "body": pause_message
+            },
+            vibration={"enabled": True, "duration_ms": 300, "intensity": "high"},
+            metadata={
+                "cognitive_event": event.cognitive_event,
+                "cognitive_precision": event.cognitive_precision,
+                "confidence": event.confidence,
+                "activity_uuid": event.activity_uuid
+            },
+            timestamp=int(datetime.utcnow().timestamp() * 1000)
+        )
+
+        print(f"[PROCESS_INTERVENTION] [INFO] Pausa enviada para sesion: {event.session_id}")
+        return recommendation.to_dict()
+
+    def _create_instruction_recommendation(
+        self,
+        event: MonitoringEventDTO,
+        config: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        activity_details = self.activity_details_client.get_activity_details(
+            event.activity_uuid
+        )
+
+        company_id = event.context.get("company_id") if event.context else None
+
+        if company_id and config.get("video_suggestions", True):
+            video_content = self._find_video_content(
+                company_id=company_id,
+                topic=activity_details.title if activity_details else None,
+                subtopic=activity_details.subtitle if activity_details else None,
+                activity_type=activity_details.activity_type if activity_details else None
+            )
+
+            if video_content:
+                return self._build_video_recommendation(event, video_content)
+
+        if not config.get("text_notifications", True):
+            print(f"[PROCESS_INTERVENTION] [INFO] Texto desactivado y no hay video")
+            return None
+
+        text_content = None
+
+        if activity_details:
+            text_content = self.gemini_client.generate_instruction(
+                topic=activity_details.title,
+                subtopic=activity_details.subtitle,
+                activity_type=activity_details.activity_type,
+                title=activity_details.title,
+                objective=activity_details.content,
+                cognitive_event=event.cognitive_event,
+                precision=event.cognitive_precision
+            )
+
+        if not text_content:
+            text_content = self.INSTRUCTION_FALLBACK.get(
+                event.cognitive_event,
+                "Continuar actividad. Tu puedes 💪"
+            )
+
+        recommendation = RecommendationDTO(
+            session_id=event.session_id,
+            user_id=event.user_id,
+            action="instruction",
+            content={
+                "type": "text",
+                "body": text_content
+            },
+            vibration={"enabled": True, "duration_ms": 100, "intensity": "low"},
             metadata={
                 "cognitive_event": event.cognitive_event,
                 "cognitive_precision": event.cognitive_precision,
                 "confidence": event.confidence,
                 "activity_uuid": event.activity_uuid,
-                "is_default": True
+                "is_generated": text_content != self.INSTRUCTION_FALLBACK.get(event.cognitive_event)
             },
             timestamp=int(datetime.utcnow().timestamp() * 1000)
         )
 
+        print(f"[PROCESS_INTERVENTION] [INFO] Instruccion enviada para sesion: {event.session_id}")
         return recommendation.to_dict()
 
-    def _get_default_content(self, intervention_type: str, cognitive_event: str) -> str:
-        defaults = {
-            "vibration": {
-                "frustracion": "Respira profundo. Puedes hacerlo.",
-                "desatencion": "Enfoca tu atencion en la actividad.",
-                "cansancio_cognitivo": "Toma un momento para relajarte."
-            },
-            "instruction": {
-                "frustracion": "Vamos paso a paso. Lee con calma las instrucciones.",
-                "desatencion": "Concentrate en la actividad actual. Puedes lograrlo.",
-                "cansancio_cognitivo": "Es normal sentirse cansado. Toma un breve descanso."
-            },
-            "pause": {
-                "frustracion": "Es momento de pausar. Regresa cuando te sientas mejor.",
-                "desatencion": "Toma una pausa corta y regresa enfocado.",
-                "cansancio_cognitivo": "Tu mente necesita descanso. Pausa de 10 minutos."
-            }
-        }
-
-        type_defaults = defaults.get(intervention_type, defaults["instruction"])
-        return type_defaults.get(cognitive_event, "Continua con tu actividad.")
-
-    def _find_content(
+    def _find_video_content(
         self,
-        topic: str,
+        company_id: str,
+        topic: Optional[str],
         subtopic: Optional[str],
-        activity_type: Optional[str],
-        intervention_type: str
-    ) -> Optional[str]:
-        content = self.content_repository.find_by_criteria(
+        activity_type: Optional[str]
+    ) -> Optional[Any]:
+        if not topic:
+            return None
+
+        content = self.content_repository.find_video_by_criteria(
+            company_id=company_id,
             topic=topic,
             subtopic=subtopic,
             activity_type=activity_type,
-            intervention_type=intervention_type
+            intervention_type="instruction"
         )
-        if content:
-            return content.content
+        return content
 
-        content = self.content_repository.find_by_criteria(
-            topic=topic,
-            activity_type=activity_type,
-            intervention_type=intervention_type
+    def _build_video_recommendation(
+        self,
+        event: MonitoringEventDTO,
+        video_content: Any
+    ) -> Dict[str, Any]:
+        recommendation = RecommendationDTO(
+            session_id=event.session_id,
+            user_id=event.user_id,
+            action="instruction",
+            content={
+                "type": "video",
+                "url": video_content.content_url
+            },
+            vibration={"enabled": True, "duration_ms": 100, "intensity": "low"},
+            metadata={
+                "cognitive_event": event.cognitive_event,
+                "cognitive_precision": event.cognitive_precision,
+                "confidence": event.confidence,
+                "activity_uuid": event.activity_uuid,
+                "content_id": video_content.id
+            },
+            timestamp=int(datetime.utcnow().timestamp() * 1000)
         )
-        if content:
-            return content.content
 
-        content = self.content_repository.find_by_criteria(
-            topic=topic,
-            intervention_type=intervention_type
-        )
-        if content:
-            return content.content
-
-        return None
-
-    def _get_vibration_config(self, intervention_type: str) -> Dict[str, Any]:
-        configs = {
-            "vibration": {"enabled": True, "duration_ms": 200, "intensity": "medium"},
-            "instruction": {"enabled": True, "duration_ms": 100, "intensity": "low"},
-            "pause": {"enabled": True, "duration_ms": 300, "intensity": "high"}
-        }
-        return configs.get(intervention_type, {"enabled": False, "duration_ms": 0, "intensity": "none"})
+        print(f"[PROCESS_INTERVENTION] [INFO] Video enviado para sesion: {event.session_id}")
+        return recommendation.to_dict()

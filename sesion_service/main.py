@@ -5,31 +5,36 @@ from src.infrastructure.persistence.database import create_tables
 from src.infrastructure.messaging.rabbitmq_client import RabbitMQClient
 from src.infrastructure.messaging.activity_details_consumer import ActivityDetailsConsumer
 from src.infrastructure.messaging.websocket_event_consumer import WebsocketEventConsumer
+from src.infrastructure.messaging.session_config_consumer import SessionConfigConsumer
 from src.presentation.controllers.session_controller import router as session_router
 from src.presentation.controllers.activity_controller import router as activity_router
 
 rabbitmq_client = None
 activity_details_consumer = None
 websocket_event_consumer = None
+session_config_consumer = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global rabbitmq_client, activity_details_consumer, websocket_event_consumer
+    global rabbitmq_client, activity_details_consumer, websocket_event_consumer, session_config_consumer
     print(f"[MAIN] [INFO] Iniciando Session Service...")
     create_tables()
-    
+
     rabbitmq_client = RabbitMQClient()
-    
+
     activity_details_consumer = ActivityDetailsConsumer(rabbitmq_client)
     activity_details_consumer.start()
-    
+
     websocket_event_consumer = WebsocketEventConsumer()
     websocket_event_consumer.start()
-    
+
+    session_config_consumer = SessionConfigConsumer(rabbitmq_client)
+    session_config_consumer.start()
+
     print(f"[MAIN] [INFO] Session Service iniciado correctamente")
     yield
-    
+
     if rabbitmq_client:
         rabbitmq_client.close()
     if websocket_event_consumer:

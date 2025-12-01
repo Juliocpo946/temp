@@ -5,6 +5,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from src.infrastructure.messaging.rabbitmq_client import RabbitMQClient
 from src.infrastructure.messaging.activity_details_client import ActivityDetailsClient
+from src.infrastructure.messaging.session_config_client import SessionConfigClient
 from src.infrastructure.cache.redis_client import RedisClient
 from src.infrastructure.config.settings import (
     MONITORING_EVENTS_QUEUE,
@@ -26,6 +27,7 @@ class InterventionConsumer:
         self.redis_client = RedisClient()
         self.rabbitmq_client = RabbitMQClient()
         self.activity_details_client = ActivityDetailsClient(self.rabbitmq_client, self.redis_client)
+        self.session_config_client = SessionConfigClient(self.rabbitmq_client, self.redis_client)
         self.gemini_client = GeminiClient(self.redis_client)
         self.executor = ThreadPoolExecutor(max_workers=INTERVENTION_CONSUMER_WORKERS)
         self._running = False
@@ -78,6 +80,7 @@ class InterventionConsumer:
             use_case = ProcessInterventionUseCase(
                 content_repository=content_repository,
                 activity_details_client=self.activity_details_client,
+                session_config_client=self.session_config_client,
                 gemini_client=self.gemini_client,
                 redis_client=self.redis_client
             )
@@ -89,15 +92,11 @@ class InterventionConsumer:
                 if success:
                     print(f"[INTERVENTION_CONSUMER] [INFO] Recomendacion publicada en cola: {RECOMMENDATIONS_QUEUE}")
                     self._log(f"Recomendacion publicada para sesion: {event.session_id}")
-                else:
-                    print(f"[INTERVENTION_CONSUMER] [ERROR] Error publicando recomendacion")
-                    self._log(f"Error publicando recomendacion para sesion: {event.session_id}", "error")
 
             self._safe_ack(ch, method.delivery_tag)
 
         except Exception as e:
             print(f"[INTERVENTION_CONSUMER] [ERROR] Error procesando evento: {str(e)}")
-            self._log(f"Error procesando evento: {str(e)}", "error")
             self._safe_nack(ch, method.delivery_tag)
         finally:
             db.close()
@@ -122,10 +121,7 @@ class InterventionConsumer:
             "level": level,
             "message": message
         }
-        try:
-            self.rabbitmq_client.publish(LOG_SERVICE_QUEUE, log_message)
-        except Exception:
-            pass
+        self.rabbitmq_client.publish(LOG_SERVICE_QUEUE, log_message)
 
     def close(self) -> None:
         self._running = False
@@ -137,5 +133,4 @@ class InterventionConsumer:
                 self._connection.close()
         except Exception as e:
             print(f"[INTERVENTION_CONSUMER] [ERROR] Error cerrando consumer: {str(e)}")
-        self.rabbitmq_client.close()
-        print(f"[INTERVENTION_CONSUMER] [INFO] Consumer de intervenciones cerrado")
+        print(f"[INTERVENTION_CONSUMER] [INFO] Consumer cerrado")
