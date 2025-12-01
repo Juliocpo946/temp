@@ -11,6 +11,7 @@ manager = ConnectionManager()
 rabbitmq_client = RabbitMQClient()
 websocket_publisher = WebsocketEventPublisher(rabbitmq_client)
 
+
 @router.websocket("/ws/{session_id}/{activity_uuid}")
 async def websocket_endpoint(websocket: WebSocket, session_id: str, activity_uuid: str):
     state = await manager.connect(websocket, session_id, activity_uuid)
@@ -45,6 +46,7 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str, activity_uui
             )
     finally:
         db.close()
+
 
 @router.get("/ws/connections")
 def get_connections():

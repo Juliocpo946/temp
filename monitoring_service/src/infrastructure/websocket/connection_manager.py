@@ -1,14 +1,16 @@
-from typing import Dict, Optional
-from dataclasses import dataclass, field
+from typing import Dict, Optional, List
+from dataclasses import dataclass
 from fastapi import WebSocket
 from src.infrastructure.ml.sequence_buffer import SequenceBuffer
 from src.domain.services.intervention_controller import SessionContext
+
 
 @dataclass
 class ActivityMetadata:
     user_id: int
     external_activity_id: int
     company_id: Optional[str] = None
+
 
 class ConnectionState:
     def __init__(self, websocket: WebSocket, session_id: str, activity_uuid: str):
@@ -29,9 +31,15 @@ class ConnectionState:
         self.is_ready = True
         self.context.reset_for_activity(external_activity_id)
 
+
 class ConnectionManager:
-    def __init__(self):
-        self.active_connections: Dict[str, ConnectionState] = {}
+    _instance = None
+    
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+            cls._instance.active_connections: Dict[str, ConnectionState] = {}
+        return cls._instance
 
     async def connect(self, websocket: WebSocket, session_id: str, activity_uuid: str) -> ConnectionState:
         await websocket.accept()
@@ -50,6 +58,18 @@ class ConnectionManager:
 
     def get_state(self, activity_uuid: str) -> Optional[ConnectionState]:
         return self.active_connections.get(activity_uuid)
+
+    def get_state_by_session_id(self, session_id: str) -> Optional[ConnectionState]:
+        for state in self.active_connections.values():
+            if state.session_id == session_id:
+                return state
+        return None
+
+    def get_all_states_by_session_id(self, session_id: str) -> List[ConnectionState]:
+        return [
+            state for state in self.active_connections.values()
+            if state.session_id == session_id
+        ]
 
     def get_all_connections(self) -> Dict[str, ConnectionState]:
         return self.active_connections
