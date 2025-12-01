@@ -45,6 +45,44 @@ class RedisClient:
             print(f"[REDIS_CLIENT] [ERROR] Error cacheando detalles de actividad: {str(e)}")
             return False
 
+    def get_session_config(self, session_id: str) -> Optional[Dict[str, Any]]:
+        if not self._is_available():
+            return None
+        try:
+            key = f"session_config:{session_id}"
+            data = self.client.get(key)
+            if data:
+                print(f"[REDIS_CLIENT] [INFO] Cache hit para config de sesion: {session_id}")
+                return json.loads(data)
+            return None
+        except Exception as e:
+            print(f"[REDIS_CLIENT] [ERROR] Error obteniendo config de sesion: {str(e)}")
+            return None
+
+    def set_session_config(self, session_id: str, config: Dict[str, Any], ttl: int = 300) -> bool:
+        if not self._is_available():
+            return False
+        try:
+            key = f"session_config:{session_id}"
+            self.client.setex(key, ttl, json.dumps(config))
+            print(f"[REDIS_CLIENT] [INFO] Config de sesion cacheada: {session_id}")
+            return True
+        except Exception as e:
+            print(f"[REDIS_CLIENT] [ERROR] Error cacheando config de sesion: {str(e)}")
+            return False
+
+    def delete_session_config(self, session_id: str) -> bool:
+        if not self._is_available():
+            return False
+        try:
+            key = f"session_config:{session_id}"
+            self.client.delete(key)
+            print(f"[REDIS_CLIENT] [INFO] Config de sesion eliminada: {session_id}")
+            return True
+        except Exception as e:
+            print(f"[REDIS_CLIENT] [ERROR] Error eliminando config de sesion: {str(e)}")
+            return False
+
     def _generate_content_key(
         self,
         topic: str,
@@ -115,6 +153,30 @@ class RedisClient:
         except Exception as e:
             print(f"[REDIS_CLIENT] [ERROR] Error obteniendo rate limit: {str(e)}")
             return 0
+
+    def get_circuit_breaker_state(self, service: str) -> Optional[Dict[str, Any]]:
+        if not self._is_available():
+            return None
+        try:
+            key = f"circuit_breaker:{service}"
+            data = self.client.get(key)
+            if data:
+                return json.loads(data)
+            return None
+        except Exception as e:
+            print(f"[REDIS_CLIENT] [ERROR] Error obteniendo estado circuit breaker: {str(e)}")
+            return None
+
+    def set_circuit_breaker_state(self, service: str, state: Dict[str, Any], ttl: int = 300) -> bool:
+        if not self._is_available():
+            return False
+        try:
+            key = f"circuit_breaker:{service}"
+            self.client.setex(key, ttl, json.dumps(state))
+            return True
+        except Exception as e:
+            print(f"[REDIS_CLIENT] [ERROR] Error guardando estado circuit breaker: {str(e)}")
+            return False
 
     def close(self):
         pass

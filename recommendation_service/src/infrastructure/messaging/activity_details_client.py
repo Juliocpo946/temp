@@ -8,8 +8,9 @@ from src.infrastructure.messaging.rabbitmq_client import RabbitMQClient
 from src.infrastructure.cache.redis_client import RedisClient
 from src.infrastructure.config.settings import (
     ACTIVITY_DETAILS_REQUEST_QUEUE,
-    ACTIVITY_DETAILS_RESPONSE_QUEUE,
-    ACTIVITY_DETAILS_CACHE_TTL
+    ACTIVITY_DETAILS_CACHE_TTL,
+    RABBITMQ_TIMEOUT,
+    MAX_RETRIES
 )
 from src.application.dtos.activity_details_dto import ActivityDetailsRequestDTO, ActivityDetailsResponseDTO
 
@@ -21,6 +22,8 @@ class ActivityDetailsClient:
         self._pending_requests: Dict[str, Optional[ActivityDetailsResponseDTO]] = {}
         self._lock = threading.Lock()
         self._response_consumer_started = False
+        self._instance_id = str(uuid.uuid4())[:8]
+        self._response_queue = f"activity_details_response_{self._instance_id}"
         self._start_response_consumer()
 
     def _start_response_consumer(self) -> None:
@@ -30,13 +33,16 @@ class ActivityDetailsClient:
         thread = threading.Thread(target=self._consume_responses, daemon=True)
         thread.start()
         self._response_consumer_started = True
-        print(f"[ACTIVITY_DETAILS_CLIENT] [INFO] Consumer de respuestas iniciado")
+        print(f"[ACTIVITY_DETAILS_CLIENT] [INFO] Consumer de respuestas iniciado en cola: {self._response_queue}")
 
     def _consume_responses(self) -> None:
         try:
-            self.rabbitmq_client.consume(ACTIVITY_DETAILS_RESPONSE_QUEUE, self._handle_response)
+            self.rabbitmq_client.consume_exclusive(self._response_queue, self._handle_response)
         except Exception as e:
             print(f"[ACTIVITY_DETAILS_CLIENT] [ERROR] Error en consumer de respuestas: {e}")
+            time.sleep(5)
+            self._response_consumer_started = False
+            self._start_response_consumer()
 
     def _handle_response(self, ch, method, properties, body) -> None:
         try:
@@ -81,44 +87,54 @@ class ActivityDetailsClient:
                 return ActivityDetailsResponseDTO.from_dict(cached)
             return None
         except Exception as e:
-            print(f"[ACTIVITY_DETAILS_CLIENT] [ERROR] Error obteniendo de cache: {e}")
+            print(f"[ACTIVITY_DETAILS_CLIENT] [ERROR] Error obteniendo cache: {e}")
             return None
 
-    def get_activity_details(self, activity_uuid: str, timeout: float = 5.0) -> Optional[ActivityDetailsResponseDTO]:
+    def get_activity_details(self, activity_uuid: str, timeout: float = None) -> Optional[ActivityDetailsResponseDTO]:
+        if timeout is None:
+            timeout = float(RABBITMQ_TIMEOUT)
+
         cached = self._get_cached(activity_uuid)
         if cached:
-            print(f"[ACTIVITY_DETAILS_CLIENT] [INFO] Cache hit para actividad: {activity_uuid}")
             return cached
 
+        for attempt in range(MAX_RETRIES):
+            result = self._request_with_timeout(activity_uuid, timeout)
+            if result:
+                return result
+            
+            if attempt < MAX_RETRIES - 1:
+                wait_time = (attempt + 1) * 0.5
+                print(f"[ACTIVITY_DETAILS_CLIENT] [INFO] Reintentando solicitud (intento {attempt + 2}/{MAX_RETRIES})")
+                time.sleep(wait_time)
+
+        print(f"[ACTIVITY_DETAILS_CLIENT] [WARNING] No se pudo obtener detalles para: {activity_uuid}")
+        return None
+
+    def _request_with_timeout(self, activity_uuid: str, timeout: float) -> Optional[ActivityDetailsResponseDTO]:
         correlation_id = str(uuid.uuid4())
 
         with self._lock:
             self._pending_requests[correlation_id] = None
 
-        request = ActivityDetailsRequestDTO(
-            activity_uuid=activity_uuid,
-            correlation_id=correlation_id
-        )
+        request = {
+            "type": "activity_details_request",
+            "activity_uuid": activity_uuid,
+            "correlation_id": correlation_id,
+            "reply_to": self._response_queue
+        }
 
-        success = self.rabbitmq_client.publish(
-            ACTIVITY_DETAILS_REQUEST_QUEUE,
-            request.to_dict()
-        )
-
+        success = self.rabbitmq_client.publish(ACTIVITY_DETAILS_REQUEST_QUEUE, request)
         if not success:
-            print(f"[ACTIVITY_DETAILS_CLIENT] [ERROR] No se pudo publicar solicitud para actividad: {activity_uuid}")
             with self._lock:
                 del self._pending_requests[correlation_id]
             return None
 
-        print(f"[ACTIVITY_DETAILS_CLIENT] [INFO] Solicitud enviada para actividad: {activity_uuid}")
-
         start_time = time.time()
         while time.time() - start_time < timeout:
             with self._lock:
-                response = self._pending_requests.get(correlation_id)
-                if response is not None:
-                    del self._pending_requests[correlation_id]
+                if self._pending_requests.get(correlation_id) is not None:
+                    response = self._pending_requests.pop(correlation_id)
                     return response
             time.sleep(0.05)
 
@@ -126,5 +142,5 @@ class ActivityDetailsClient:
             if correlation_id in self._pending_requests:
                 del self._pending_requests[correlation_id]
 
-        print(f"[ACTIVITY_DETAILS_CLIENT] [ERROR] Timeout esperando respuesta para actividad: {activity_uuid}")
+        print(f"[ACTIVITY_DETAILS_CLIENT] [WARNING] Timeout esperando respuesta para: {activity_uuid}")
         return None
