@@ -2,18 +2,27 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from src.infrastructure.config.settings import SERVICE_PORT, AUTH_SERVICE_URL, LOG_SERVICE_URL
+from src.infrastructure.config.settings import (
+    SERVICE_PORT,
+    AUTH_SERVICE_URL,
+    LOG_SERVICE_URL,
+    MONITORING_SERVICE_URL,
+    SESSION_SERVICE_URL,
+    RECOMMENDATION_SERVICE_URL
+)
 from src.infrastructure.http.http_client import HTTPClient
 from src.infrastructure.messaging.rabbitmq_client import RabbitMQClient
 from src.infrastructure.cache.redis_client import RedisClient
 from src.infrastructure.messaging.cache_invalidation_consumer import CacheInvalidationConsumer
 from src.presentation.middleware.gateway_middleware import GatewayMiddleware
 from src.presentation.routes.gateway_routes import router
+from src.presentation.routes.gateway_routes import router as ws_router
 
 http_client = HTTPClient()
 rabbitmq_client = RabbitMQClient()
 redis_client = RedisClient()
 cache_consumer = None
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -27,6 +36,7 @@ async def lifespan(app: FastAPI):
     redis_client.close()
     print("API Gateway detenido")
 
+
 app = FastAPI(
     title="API Gateway",
     version="1.0.0",
@@ -36,7 +46,12 @@ app = FastAPI(
     openapi_url=None
 )
 
-app.add_middleware(GatewayMiddleware, http_client=http_client, rabbitmq_client=rabbitmq_client, redis_client=redis_client)
+app.add_middleware(
+    GatewayMiddleware,
+    http_client=http_client,
+    rabbitmq_client=rabbitmq_client,
+    redis_client=redis_client
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -46,30 +61,65 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(ws_router)
 app.include_router(router)
+
 
 @app.get("/health")
 async def health_check():
     return {"status": "ok", "service": "api-gateway"}
 
+
 @app.get("/health/services")
 async def health_check_services():
-    try:
-        auth_response = await http_client.get(f"{AUTH_SERVICE_URL}/health")
-        log_response = await http_client.get(f"{LOG_SERVICE_URL}/health")
-        
-        return {
-            "status": "ok",
-            "services": {
-                "auth-service": auth_response,
-                "log-service": log_response
-            }
-        }
-    except Exception as e:
-        return JSONResponse(
-            status_code=500,
-            content={"status": "error", "message": str(e)}
-        )
+    services_status = {}
+    
+    if AUTH_SERVICE_URL:
+        try:
+            auth_response = await http_client.get(f"{AUTH_SERVICE_URL}/health")
+            services_status["auth-service"] = auth_response
+        except Exception as e:
+            services_status["auth-service"] = {"status": "error", "message": str(e)}
+    
+    if LOG_SERVICE_URL:
+        try:
+            log_response = await http_client.get(f"{LOG_SERVICE_URL}/health")
+            services_status["log-service"] = log_response
+        except Exception as e:
+            services_status["log-service"] = {"status": "error", "message": str(e)}
+    
+    if MONITORING_SERVICE_URL:
+        try:
+            monitoring_response = await http_client.get(f"{MONITORING_SERVICE_URL}/health")
+            services_status["monitoring-service"] = monitoring_response
+        except Exception as e:
+            services_status["monitoring-service"] = {"status": "error", "message": str(e)}
+    
+    if SESSION_SERVICE_URL:
+        try:
+            session_response = await http_client.get(f"{SESSION_SERVICE_URL}/health")
+            services_status["session-service"] = session_response
+        except Exception as e:
+            services_status["session-service"] = {"status": "error", "message": str(e)}
+    
+    if RECOMMENDATION_SERVICE_URL:
+        try:
+            recommendation_response = await http_client.get(f"{RECOMMENDATION_SERVICE_URL}/health")
+            services_status["recommendation-service"] = recommendation_response
+        except Exception as e:
+            services_status["recommendation-service"] = {"status": "error", "message": str(e)}
+    
+    all_ok = all(
+        s.get("status") == "ok"
+        for s in services_status.values()
+        if isinstance(s, dict)
+    )
+    
+    return {
+        "status": "ok" if all_ok else "degraded",
+        "services": services_status
+    }
+
 
 if __name__ == "__main__":
     import uvicorn

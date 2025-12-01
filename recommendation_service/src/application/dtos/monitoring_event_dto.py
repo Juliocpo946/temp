@@ -1,45 +1,56 @@
-from datetime import datetime
-from typing import Optional
+from typing import Dict, Any
+
 
 class MonitoringEventDTO:
     def __init__(
         self,
         session_id: str,
         user_id: int,
-        company_id: str,
-        timestamp: int,
-        evento_cognitivo: str,
-        precision_cognitiva: float,
-        confianza: float,
-        tiempo_en_actividad: int,
-        activity_type: str,
+        activity_uuid: str,
         external_activity_id: int,
-        intentos_fallidos: Optional[int] = None
+        cognitive_event: str,
+        suggested_action: str,
+        cognitive_precision: float,
+        confidence: float,
+        context: Dict[str, Any],
+        timestamp: int
     ):
         self.session_id = session_id
         self.user_id = user_id
-        self.company_id = company_id
-        self.timestamp = timestamp
-        self.evento_cognitivo = evento_cognitivo
-        self.precision_cognitiva = precision_cognitiva
-        self.confianza = confianza
-        self.tiempo_en_actividad = tiempo_en_actividad
-        self.activity_type = activity_type
+        self.activity_uuid = activity_uuid
         self.external_activity_id = external_activity_id
-        self.intentos_fallidos = intentos_fallidos
+        self.cognitive_event = cognitive_event
+        self.suggested_action = suggested_action
+        self.cognitive_precision = cognitive_precision
+        self.confidence = confidence
+        self.context = context
+        self.timestamp = timestamp
 
-    @staticmethod
-    def from_dict(data: dict) -> 'MonitoringEventDTO':
-        return MonitoringEventDTO(
-            session_id=data.get('session_id'),
-            user_id=data.get('user_id'),
-            company_id=data.get('company_id'),
-            timestamp=data.get('timestamp'),
-            evento_cognitivo=data.get('evento_cognitivo'),
-            precision_cognitiva=data.get('precision_cognitiva'),
-            confianza=data.get('confianza'),
-            tiempo_en_actividad=data.get('tiempo_en_actividad'),
-            activity_type=data.get('activity_type'),
-            external_activity_id=data.get('external_activity_id'),
-            intentos_fallidos=data.get('intentos_fallidos')
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "MonitoringEventDTO":
+        return cls(
+            session_id=data.get("session_id"),
+            user_id=data.get("user_id"),
+            activity_uuid=data.get("activity_uuid"),
+            external_activity_id=data.get("external_activity_id"),
+            cognitive_event=data.get("evento_cognitivo", data.get("cognitive_event")),
+            suggested_action=data.get("accion_sugerida", data.get("suggested_action")),
+            cognitive_precision=data.get("precision_cognitiva", data.get("cognitive_precision", 0.5)),
+            confidence=data.get("confianza", data.get("confidence", 0.5)),
+            context=data.get("contexto", data.get("context", {})),
+            timestamp=data.get("timestamp")
         )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "session_id": self.session_id,
+            "user_id": self.user_id,
+            "activity_uuid": self.activity_uuid,
+            "external_activity_id": self.external_activity_id,
+            "cognitive_event": self.cognitive_event,
+            "suggested_action": self.suggested_action,
+            "cognitive_precision": self.cognitive_precision,
+            "confidence": self.confidence,
+            "context": self.context,
+            "timestamp": self.timestamp
+        }

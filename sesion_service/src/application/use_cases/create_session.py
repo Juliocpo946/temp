@@ -5,7 +5,7 @@ from src.domain.entities.analysis_config import AnalysisConfig
 from src.domain.repositories.session_repository import SessionRepository
 from src.domain.repositories.analysis_config_repository import AnalysisConfigRepository
 from src.infrastructure.messaging.rabbitmq_client import RabbitMQClient
-from src.application.dtos.session_dto import SessionDTO
+from src.infrastructure.config.settings import LOG_SERVICE_QUEUE
 
 class CreateSessionUseCase:
     def __init__(
@@ -31,10 +31,7 @@ class CreateSessionUseCase:
             company_id=uuid.UUID(company_id),
             disability_type=disability_type,
             cognitive_analysis_enabled=cognitive_analysis_enabled,
-            status="activa",
-            current_activity=None,
             created_at=datetime.utcnow(),
-            last_heartbeat_at=datetime.utcnow(),
             ended_at=None
         )
 
@@ -51,18 +48,17 @@ class CreateSessionUseCase:
         )
         self.config_repo.create(config)
 
-        self._publish_log(f"Sesion creada: {created_session.id}", "info")
+        self._publish_log(f"Sesion creada: {created_session.id}")
 
         return {
             'session_id': str(created_session.id),
-            'status': created_session.status,
             'created_at': created_session.created_at.isoformat()
         }
 
-    def _publish_log(self, message: str, level: str) -> None:
+    def _publish_log(self, message: str, level: str = "info") -> None:
         log_message = {
             'service': 'session-service',
             'level': level,
             'message': message
         }
-        self.rabbitmq_client.publish('logs', log_message)
+        self.rabbitmq_client.publish(LOG_SERVICE_QUEUE, log_message)

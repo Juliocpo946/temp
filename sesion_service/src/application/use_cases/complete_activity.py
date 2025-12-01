@@ -1,53 +1,48 @@
-from src.domain.repositories.session_repository import SessionRepository
 from src.domain.repositories.activity_log_repository import ActivityLogRepository
 from src.infrastructure.messaging.rabbitmq_client import RabbitMQClient
+from src.infrastructure.messaging.activity_event_publisher import ActivityEventPublisher
+from src.infrastructure.config.settings import LOG_SERVICE_QUEUE
 
 class CompleteActivityUseCase:
     def __init__(
         self,
-        session_repo: SessionRepository,
         activity_log_repo: ActivityLogRepository,
         rabbitmq_client: RabbitMQClient
     ):
-        self.session_repo = session_repo
         self.activity_log_repo = activity_log_repo
         self.rabbitmq_client = rabbitmq_client
+        self.event_publisher = ActivityEventPublisher(rabbitmq_client)
 
-    def execute(
-        self,
-        session_id: str,
-        external_activity_id: int,
-        feedback: dict
-    ) -> dict:
-        session = self.session_repo.get_by_id(session_id)
-        if not session:
-            self._publish_log(f"Sesion no encontrada: {session_id}", "error")
-            raise ValueError("Sesion no encontrada")
+    def execute(self, activity_uuid: str, feedback: dict) -> dict:
+        activity = self.activity_log_repo.get_by_uuid(activity_uuid)
+        if not activity:
+            self._publish_log(f"Actividad no encontrada: {activity_uuid}", "error")
+            raise ValueError("Actividad no encontrada")
 
-        activity_logs = self.activity_log_repo.get_by_session_id(session_id)
-        current_activity = next(
-            (a for a in activity_logs if a.external_activity_id == external_activity_id and a.status == "en_progreso"),
-            None
+        if activity.status not in ["en_progreso", "pausada"]:
+            self._publish_log(f"Actividad no puede completarse: {activity_uuid} (estado: {activity.status})", "error")
+            raise ValueError(f"La actividad no puede completarse, estado actual: {activity.status}")
+
+        activity.complete(feedback)
+        self.activity_log_repo.update(activity)
+
+        self.event_publisher.publish_activity_completed(
+            activity_uuid,
+            str(activity.session_id)
         )
 
-        if not current_activity:
-            self._publish_log(f"Actividad no encontrada: {external_activity_id}", "error")
-            raise ValueError("Actividad no encontrada o ya completada")
+        self._publish_log(f"Actividad completada: {activity_uuid}")
 
-        current_activity.complete(feedback)
-        self.activity_log_repo.update(current_activity)
+        return {
+            'status': 'completada',
+            'activity_uuid': activity_uuid,
+            'completed_at': activity.completed_at.isoformat()
+        }
 
-        session.current_activity = None
-        self.session_repo.update(session)
-
-        self._publish_log(f"Actividad completada: {external_activity_id}", "error")
-
-        return {'status': 'completada'}
-
-    def _publish_log(self, message: str, level: str) -> None:
+    def _publish_log(self, message: str, level: str = "info") -> None:
         log_message = {
             'service': 'session-service',
             'level': level,
             'message': message
         }
-        self.rabbitmq_client.publish('logs', log_message)
+        self.rabbitmq_client.publish(LOG_SERVICE_QUEUE, log_message)

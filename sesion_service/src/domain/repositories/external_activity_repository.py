@@ -12,5 +12,12 @@ class ExternalActivityRepository(ABC):
         pass
 
     @abstractmethod
-    def get_or_create(self, external_activity_id: int, title: str, subtitle: Optional[str], content: Optional[str], activity_type: str) -> ExternalActivity:
+    def get_or_create(
+        self,
+        external_activity_id: int,
+        title: str,
+        subtitle: Optional[str],
+        content: Optional[str],
+        activity_type: str
+    ) -> ExternalActivity:
         pass

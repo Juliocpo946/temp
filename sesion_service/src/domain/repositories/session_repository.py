@@ -16,9 +16,9 @@ class SessionRepository(ABC):
         pass
 
     @abstractmethod
-    def get_sessions_without_heartbeat(self, seconds: int) -> List[Session]:
+    def get_by_user_id(self, user_id: int) -> List[Session]:
         pass
 
     @abstractmethod
-    def get_inactive_sessions(self, hours: int) -> List[Session]:
+    def delete_old_sessions(self, hours: int) -> int:
         pass
