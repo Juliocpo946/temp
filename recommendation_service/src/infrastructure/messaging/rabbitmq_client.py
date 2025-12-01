@@ -28,13 +28,13 @@ class RabbitMQClient:
         if self.channel is None or self.channel.is_closed:
             self.channel = self.connection.channel()
 
-    def declare_queue(self, queue_name: str, with_dlq: bool = False) -> None:
+    def declare_queue(self, queue_name: str, with_dlq: bool = True) -> None:
         self._ensure_connection()
-        
+
         if with_dlq:
             dlq_name = f"{queue_name}_dlq"
             self.channel.queue_declare(queue=dlq_name, durable=True)
-            
+
             self.channel.queue_declare(
                 queue=queue_name,
                 durable=True,
@@ -57,22 +57,28 @@ class RabbitMQClient:
         )
         return result.method.queue
 
-    def publish(self, queue_name: str, message: Dict[str, Any]) -> bool:
+    def publish(self, queue_name: str, message: Dict[str, Any], correlation_id: Optional[str] = None) -> bool:
         max_retries = 3
         retry_count = 0
 
         while retry_count < max_retries:
             try:
                 self._ensure_connection()
-                self.declare_queue(queue_name)
+                self.declare_queue(queue_name, with_dlq=False)
+                
+                properties = pika.BasicProperties(
+                    delivery_mode=2,
+                    content_type='application/json'
+                )
+                
+                if correlation_id:
+                    properties.correlation_id = correlation_id
+                
                 self.channel.basic_publish(
                     exchange='',
                     routing_key=queue_name,
                     body=json.dumps(message),
-                    properties=pika.BasicProperties(
-                        delivery_mode=2,
-                        content_type='application/json'
-                    )
+                    properties=properties
                 )
                 return True
             except Exception as e:
@@ -87,14 +93,14 @@ class RabbitMQClient:
                     return False
         return False
 
-    def publish_with_reply(self, queue_name: str, message: Dict[str, Any], reply_to: str) -> bool:
+    def publish_with_reply(self, queue_name: str, message: Dict[str, Any], reply_to: str, correlation_id: str) -> bool:
         max_retries = 3
         retry_count = 0
 
         while retry_count < max_retries:
             try:
                 self._ensure_connection()
-                self.declare_queue(queue_name)
+                self.declare_queue(queue_name, with_dlq=False)
                 self.channel.basic_publish(
                     exchange='',
                     routing_key=queue_name,
@@ -102,13 +108,14 @@ class RabbitMQClient:
                     properties=pika.BasicProperties(
                         delivery_mode=2,
                         content_type='application/json',
-                        reply_to=reply_to
+                        reply_to=reply_to,
+                        correlation_id=correlation_id
                     )
                 )
                 return True
             except Exception as e:
                 retry_count += 1
-                print(f"[RABBITMQ_CLIENT] [ERROR] Error publicando mensaje (intento {retry_count}/{max_retries}): {str(e)}")
+                print(f"[RABBITMQ_CLIENT] [ERROR] Error publicando mensaje con reply (intento {retry_count}/{max_retries}): {str(e)}")
                 if retry_count < max_retries:
                     try:
                         self._connect()
@@ -118,41 +125,37 @@ class RabbitMQClient:
                     return False
         return False
 
-    def consume(self, queue_name: str, callback: Callable, prefetch_count: int = 1) -> None:
+    def consume(self, queue_name: str, callback: Callable, with_dlq: bool = True) -> None:
         try:
             self._ensure_connection()
-            self.declare_queue(queue_name, with_dlq=True)
-            self.channel.basic_qos(prefetch_count=prefetch_count)
-            self.channel.basic_consume(
-                queue=queue_name,
-                on_message_callback=callback,
-                auto_ack=False
-            )
+            self.declare_queue(queue_name, with_dlq=with_dlq)
+            self.channel.basic_qos(prefetch_count=10)
+            self.channel.basic_consume(queue=queue_name, on_message_callback=callback, auto_ack=False)
             print(f"[RABBITMQ_CLIENT] [INFO] Escuchando en cola: {queue_name}")
             self.channel.start_consuming()
         except Exception as e:
             print(f"[RABBITMQ_CLIENT] [ERROR] Error consumiendo de RabbitMQ: {str(e)}")
             raise
 
-    def consume_exclusive(self, queue_name: str, callback: Callable, prefetch_count: int = 1) -> None:
+    def consume_exclusive(self, queue_name: str, callback: Callable) -> None:
         try:
             self._ensure_connection()
             self.declare_exclusive_queue(queue_name)
-            self.channel.basic_qos(prefetch_count=prefetch_count)
-            self.channel.basic_consume(
-                queue=queue_name,
-                on_message_callback=callback,
-                auto_ack=False
-            )
+            self.channel.basic_consume(queue=queue_name, on_message_callback=callback, auto_ack=False)
             print(f"[RABBITMQ_CLIENT] [INFO] Escuchando en cola exclusiva: {queue_name}")
             self.channel.start_consuming()
         except Exception as e:
             print(f"[RABBITMQ_CLIENT] [ERROR] Error consumiendo de cola exclusiva: {str(e)}")
             raise
 
+    def send_to_dlq(self, original_queue: str, message: Dict[str, Any], reason: str) -> bool:
+        dlq_name = f"{original_queue}_dlq"
+        message["dlq_reason"] = reason
+        return self.publish(dlq_name, message)
+
     def close(self) -> None:
         try:
-            if self.channel and not self.channel.is_closed:
+            if self.channel and self.channel.is_open:
                 self.channel.close()
             if self.connection and not self.connection.is_closed:
                 self.connection.close()

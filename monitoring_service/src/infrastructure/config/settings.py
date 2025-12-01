@@ -18,6 +18,7 @@ LOG_SERVICE_QUEUE = os.getenv("LOG_SERVICE_QUEUE", "logs")
 ACTIVITY_EVENTS_QUEUE = os.getenv("ACTIVITY_EVENTS_QUEUE", "activity_events")
 MONITORING_WEBSOCKET_EVENTS_QUEUE = os.getenv("MONITORING_WEBSOCKET_EVENTS_QUEUE", "monitoring_websocket_events")
 RECOMMENDATIONS_QUEUE = os.getenv("RECOMMENDATIONS_QUEUE", "recommendations")
+INTERVENTION_EVALUATIONS_QUEUE = os.getenv("INTERVENTION_EVALUATIONS_QUEUE", "intervention_evaluations")
 
 REDIS_URL = os.getenv("REDIS_URL")
 REDIS_TOKEN = os.getenv("REDIS_TOKEN")

@@ -27,7 +27,8 @@ class ProcessBiometricFrameUseCase:
         activity_uuid: str,
         session_id: str,
         user_id: int,
-        external_activity_id: int
+        external_activity_id: int,
+        correlation_id: Optional[str] = None
     ):
         self.db = db
         self.buffer = buffer
@@ -36,6 +37,8 @@ class ProcessBiometricFrameUseCase:
         self.session_id = session_id
         self.user_id = user_id
         self.external_activity_id = external_activity_id
+        self.correlation_id = correlation_id or str(uuid.uuid4())
+
         self.feature_extractor = FeatureExtractor()
         self.classifier = InterventionClassifier()
         self.controller = InterventionController()
@@ -43,10 +46,12 @@ class ProcessBiometricFrameUseCase:
         self.intervention_repo = InterventionRepository(db)
         self.training_sample_repo = TrainingSampleRepository(db)
 
-    def execute(self, frame: BiometricFrameDTO) -> None:
+    def execute(self, frame: BiometricFrameDTO) -> Optional[Dict[str, Any]]:
+        if self._activity_changed(self.external_activity_id):
+            self._reset_for_new_activity()
+
         features = self.feature_extractor.extract(frame)
-        raw_frame = frame.to_dict()
-        self.buffer.add(features, raw_frame)
+        self.buffer.add(features, frame.to_dict())
 
         if not self.buffer.is_ready():
             return None
@@ -54,96 +59,114 @@ class ProcessBiometricFrameUseCase:
         sequence = self.buffer.get_sequence()
         context_vector = self.context.get_context_vector()
 
-        intervention_type, confidence = self.classifier.classify(sequence, context_vector)
+        intervention_type, confidence = self.classifier.predict(sequence, context_vector)
 
-        if not self.classifier.should_intervene(intervention_type, confidence):
-            self._maybe_save_negative_sample(sequence, context_vector)
+        if intervention_type == InterventionType.NO_INTERVENTION:
+            self._maybe_store_negative_sample(sequence, context_vector)
             return None
 
-        if not self.controller.can_intervene(intervention_type, self.context):
+        if self.controller.is_cooldown_active(intervention_type, self.context):
             return None
 
-        intervention = self._create_intervention(
-            frame, intervention_type, confidence, sequence, context_vector
+        intervention = self._create_intervention(intervention_type, confidence, frame)
+        self._store_training_sample(sequence, context_vector, intervention)
+        self._publish_event(intervention, frame)
+        self.context.record_intervention(intervention_type)
+
+        return {
+            "type": "intervention",
+            "intervention_id": str(intervention.id),
+            "intervention_type": intervention_type.value,
+            "confidence": confidence,
+            "correlation_id": self.correlation_id
+        }
+
+    def _activity_changed(self, external_activity_id: int) -> bool:
+        if self.context.current_external_activity_id is None:
+            return True
+        return self.context.current_external_activity_id != external_activity_id
+
+    def _reset_for_new_activity(self) -> None:
+        self.buffer.clear()
+        self.context.reset_for_activity(self.external_activity_id)
+        print(f"[INFO] Contexto reiniciado para nueva actividad: {self.external_activity_id}")
+
+    def _create_intervention(
+        self,
+        intervention_type: InterventionType,
+        confidence: float,
+        frame: BiometricFrameDTO
+    ) -> Intervention:
+        cognitive_event = self._map_intervention_to_cognitive_event(intervention_type)
+
+        intervention = Intervention(
+            id=None,
+            activity_uuid=uuid.UUID(self.activity_uuid),
+            session_id=uuid.UUID(self.session_id),
+            user_id=self.user_id,
+            intervention_type=intervention_type.value,
+            cognitive_event=cognitive_event,
+            confidence=confidence,
+            precision=frame.emocion_principal.confianza if frame.emocion_principal else 0.0,
+            created_at=datetime.utcnow(),
+            result=None,
+            evaluated_at=None
         )
 
-        self.context.register_intervention(intervention_type)
+        return self.intervention_repo.create(intervention)
 
+    def _map_intervention_to_cognitive_event(self, intervention_type: InterventionType) -> str:
+        mapping = {
+            InterventionType.VIBRATION: "desatencion",
+            InterventionType.INSTRUCTION: "frustracion",
+            InterventionType.PAUSE: "cansancio_cognitivo"
+        }
+        return mapping.get(intervention_type, "desconocido")
+
+    def _store_training_sample(
+        self,
+        sequence,
+        context_vector,
+        intervention: Intervention
+    ) -> None:
+        sample = TrainingSample(
+            id=None,
+            intervention_id=intervention.id,
+            sequence_data=sequence.tolist(),
+            context_data=context_vector.tolist(),
+            label=intervention.intervention_type,
+            created_at=datetime.utcnow()
+        )
+        self.training_sample_repo.create(sample)
+
+    def _maybe_store_negative_sample(self, sequence, context_vector) -> None:
+        if random.random() < NEGATIVE_SAMPLE_RATE:
+            sample = TrainingSample(
+                id=None,
+                intervention_id=None,
+                sequence_data=sequence.tolist(),
+                context_data=context_vector.tolist(),
+                label="no_intervention",
+                created_at=datetime.utcnow()
+            )
+            self.training_sample_repo.create(sample)
+
+    def _publish_event(self, intervention: Intervention, frame: BiometricFrameDTO) -> None:
         event = MonitoringEventDTO(
             session_id=self.session_id,
             user_id=self.user_id,
             external_activity_id=self.external_activity_id,
-            activity_uuid=self.activity_uuid,
-            intervention_type=intervention_type.to_string(),
-            confidence=confidence,
-            context={
-                "precision_cognitiva": frame.emocion_principal.get("confianza", 0.5),
-                "intentos_previos": self._get_previous_attempts(intervention_type),
-                "tiempo_en_estado": self._estimate_time_in_state()
+            evento_cognitivo=intervention.cognitive_event,
+            accion_sugerida=intervention.intervention_type,
+            precision_cognitiva=intervention.precision,
+            confianza=intervention.confidence,
+            contexto={
+                "activity_uuid": self.activity_uuid,
+                "intentos_previos": self.context.instruction_count,
+                "tiempo_en_estado": 0,
+                "correlation_id": self.correlation_id
             },
             timestamp=int(datetime.utcnow().timestamp() * 1000)
         )
 
-        self.publisher.publish_intervention(event)
-
-        return None
-
-    def _create_intervention(
-        self,
-        frame: BiometricFrameDTO,
-        intervention_type: InterventionType,
-        confidence: float,
-        sequence,
-        context_vector
-    ) -> Intervention:
-        intervention = Intervention(
-            id=None,
-            session_id=uuid.UUID(self.session_id),
-            activity_uuid=uuid.UUID(self.activity_uuid),
-            external_activity_id=self.external_activity_id,
-            intervention_type=intervention_type.to_string(),
-            confidence=confidence,
-            triggered_at=datetime.utcnow(),
-            window_snapshot={"frames": self.buffer.get_snapshot()},
-            context_snapshot=self.context.get_snapshot()
-        )
-
-        saved_intervention = self.intervention_repo.create(intervention)
-
-        training_sample = TrainingSample(
-            id=None,
-            intervention_id=saved_intervention.id,
-            external_activity_id=self.external_activity_id,
-            window_data={"sequence": sequence.tolist()},
-            context_data={"context": context_vector.tolist()},
-            label=intervention_type.value,
-            source="production"
-        )
-        self.training_sample_repo.create(training_sample)
-
-        return saved_intervention
-
-    def _maybe_save_negative_sample(self, sequence, context_vector) -> None:
-        if random.random() < NEGATIVE_SAMPLE_RATE:
-            training_sample = TrainingSample(
-                id=None,
-                intervention_id=None,
-                external_activity_id=self.external_activity_id,
-                window_data={"sequence": sequence.tolist()},
-                context_data={"context": context_vector.tolist()},
-                label=0,
-                source="production"
-            )
-            self.training_sample_repo.create(training_sample)
-
-    def _get_previous_attempts(self, intervention_type: InterventionType) -> int:
-        if intervention_type == InterventionType.VIBRATION:
-            return self.context.vibration_count
-        elif intervention_type == InterventionType.INSTRUCTION:
-            return self.context.instruction_count
-        elif intervention_type == InterventionType.PAUSE:
-            return self.context.pause_count
-        return 0
-
-    def _estimate_time_in_state(self) -> int:
-        return len(self.buffer)
+        self.publisher.publish(event, self.correlation_id)

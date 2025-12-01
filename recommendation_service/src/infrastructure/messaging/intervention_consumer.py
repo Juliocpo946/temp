@@ -1,8 +1,10 @@
 import json
 import threading
+import uuid
 import pika
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
+from typing import Optional
 from src.infrastructure.messaging.rabbitmq_client import RabbitMQClient
 from src.infrastructure.messaging.activity_details_client import ActivityDetailsClient
 from src.infrastructure.messaging.session_config_client import SessionConfigClient
@@ -41,40 +43,49 @@ class InterventionConsumer:
         print(f"[INTERVENTION_CONSUMER] [INFO] Consumer iniciado con {INTERVENTION_CONSUMER_WORKERS} workers y prefetch={PREFETCH_COUNT}")
 
     def _consume_events(self) -> None:
-        try:
-            parameters = pika.URLParameters(AMQP_URL)
-            parameters.heartbeat = 600
-            parameters.blocked_connection_timeout = 300
-            self._connection = pika.BlockingConnection(parameters)
-            self._channel = self._connection.channel()
+        while self._running:
+            try:
+                parameters = pika.URLParameters(AMQP_URL)
+                parameters.heartbeat = 600
+                parameters.blocked_connection_timeout = 300
+                self._connection = pika.BlockingConnection(parameters)
+                self._channel = self._connection.channel()
 
-            self._channel.queue_declare(queue=MONITORING_EVENTS_QUEUE, durable=True)
-            self._channel.basic_qos(prefetch_count=PREFETCH_COUNT)
+                self._channel.queue_declare(queue=MONITORING_EVENTS_QUEUE, durable=True)
+                self._channel.basic_qos(prefetch_count=PREFETCH_COUNT)
 
-            self._channel.basic_consume(
-                queue=MONITORING_EVENTS_QUEUE,
-                on_message_callback=self._on_message,
-                auto_ack=False
-            )
+                self._channel.basic_consume(
+                    queue=MONITORING_EVENTS_QUEUE,
+                    on_message_callback=self._on_message,
+                    auto_ack=False
+                )
 
-            print(f"[INTERVENTION_CONSUMER] [INFO] Escuchando en cola: {MONITORING_EVENTS_QUEUE}")
-            self._channel.start_consuming()
+                print(f"[INTERVENTION_CONSUMER] [INFO] Escuchando en cola: {MONITORING_EVENTS_QUEUE}")
+                self._channel.start_consuming()
 
-        except Exception as e:
-            print(f"[INTERVENTION_CONSUMER] [ERROR] Error en consumer: {str(e)}")
-            if self._running:
-                threading.Timer(5.0, self._consume_events).start()
+            except Exception as e:
+                print(f"[INTERVENTION_CONSUMER] [ERROR] Error en consumer: {str(e)}")
+                if self._running:
+                    threading.Timer(5.0, self._consume_events).start()
+                    break
 
     def _on_message(self, ch, method, properties, body) -> None:
-        self.executor.submit(self._process_message, ch, method, body)
+        self.executor.submit(self._process_message, ch, method, properties, body)
 
-    def _process_message(self, ch, method, body) -> None:
+    def _process_message(self, ch, method, properties, body) -> None:
         db = SessionLocal()
+        correlation_id = None
+        
         try:
             message = json.loads(body)
+            
+            correlation_id = message.get("correlation_id") or \
+                           (properties.correlation_id if properties else None) or \
+                           str(uuid.uuid4())
+            
             event = MonitoringEventDTO.from_dict(message)
 
-            print(f"[INTERVENTION_CONSUMER] [INFO] Procesando evento para sesion: {event.session_id}")
+            print(f"[INTERVENTION_CONSUMER] [INFO] Procesando evento para sesion: {event.session_id}, correlation_id: {correlation_id}")
 
             content_repository = ContentRepositoryImpl(db)
             use_case = ProcessInterventionUseCase(
@@ -88,15 +99,25 @@ class InterventionConsumer:
             recommendation = use_case.execute(event)
 
             if recommendation:
-                success = self.rabbitmq_client.publish(RECOMMENDATIONS_QUEUE, recommendation)
+                recommendation["correlation_id"] = correlation_id
+                recommendation["source_correlation_id"] = message.get("correlation_id")
+                
+                success = self.rabbitmq_client.publish(
+                    RECOMMENDATIONS_QUEUE, 
+                    recommendation,
+                    correlation_id=correlation_id
+                )
                 if success:
-                    print(f"[INTERVENTION_CONSUMER] [INFO] Recomendacion publicada en cola: {RECOMMENDATIONS_QUEUE}")
-                    self._log(f"Recomendacion publicada para sesion: {event.session_id}")
+                    print(f"[INTERVENTION_CONSUMER] [INFO] Recomendacion publicada, correlation_id: {correlation_id}")
+                    self._log(
+                        f"Recomendacion publicada para sesion: {event.session_id}",
+                        correlation_id=correlation_id
+                    )
 
             self._safe_ack(ch, method.delivery_tag)
 
         except Exception as e:
-            print(f"[INTERVENTION_CONSUMER] [ERROR] Error procesando evento: {str(e)}")
+            print(f"[INTERVENTION_CONSUMER] [ERROR] Error procesando evento: {str(e)}, correlation_id: {correlation_id}")
             self._safe_nack(ch, method.delivery_tag)
         finally:
             db.close()
@@ -115,13 +136,15 @@ class InterventionConsumer:
         except Exception as e:
             print(f"[INTERVENTION_CONSUMER] [ERROR] Error en nack: {str(e)}")
 
-    def _log(self, message: str, level: str = "info") -> None:
+    def _log(self, message: str, level: str = "info", correlation_id: Optional[str] = None) -> None:
         log_message = {
             "service": "recommendation-service",
             "level": level,
-            "message": message
+            "message": message,
+            "correlation_id": correlation_id,
+            "timestamp": datetime.utcnow().isoformat()
         }
-        self.rabbitmq_client.publish(LOG_SERVICE_QUEUE, log_message)
+        self.rabbitmq_client.publish(LOG_SERVICE_QUEUE, log_message, correlation_id=correlation_id)
 
     def close(self) -> None:
         self._running = False

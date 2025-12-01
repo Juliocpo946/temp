@@ -2,7 +2,13 @@ import json
 import hashlib
 from typing import Optional, Dict, Any
 from upstash_redis import Redis
-from src.infrastructure.config.settings import REDIS_URL, REDIS_TOKEN
+from src.infrastructure.config.settings import (
+    REDIS_URL, 
+    REDIS_TOKEN,
+    CACHE_TTL,
+    ACTIVITY_DETAILS_CACHE_TTL,
+    GENERATED_CONTENT_CACHE_TTL
+)
 
 
 class RedisClient:
@@ -33,16 +39,29 @@ class RedisClient:
             print(f"[REDIS_CLIENT] [ERROR] Error obteniendo detalles de actividad: {str(e)}")
             return None
 
-    def set_activity_details(self, activity_uuid: str, data: Dict[str, Any], ttl: int = 600) -> bool:
+    def set_activity_details(self, activity_uuid: str, data: Dict[str, Any], ttl: int = None) -> bool:
         if not self._is_available():
             return False
         try:
+            if ttl is None:
+                ttl = ACTIVITY_DETAILS_CACHE_TTL
             key = f"activity_details:{activity_uuid}"
             self.client.setex(key, ttl, json.dumps(data))
             print(f"[REDIS_CLIENT] [INFO] Detalles de actividad cacheados: {activity_uuid}")
             return True
         except Exception as e:
             print(f"[REDIS_CLIENT] [ERROR] Error cacheando detalles de actividad: {str(e)}")
+            return False
+
+    def delete_activity_details(self, activity_uuid: str) -> bool:
+        if not self._is_available():
+            return False
+        try:
+            key = f"activity_details:{activity_uuid}"
+            self.client.delete(key)
+            return True
+        except Exception as e:
+            print(f"[REDIS_CLIENT] [ERROR] Error eliminando cache de actividad: {str(e)}")
             return False
 
     def get_session_config(self, session_id: str) -> Optional[Dict[str, Any]]:
@@ -59,12 +78,14 @@ class RedisClient:
             print(f"[REDIS_CLIENT] [ERROR] Error obteniendo config de sesion: {str(e)}")
             return None
 
-    def set_session_config(self, session_id: str, config: Dict[str, Any], ttl: int = 300) -> bool:
+    def set_session_config(self, session_id: str, data: Dict[str, Any], ttl: int = None) -> bool:
         if not self._is_available():
             return False
         try:
+            if ttl is None:
+                ttl = CACHE_TTL
             key = f"session_config:{session_id}"
-            self.client.setex(key, ttl, json.dumps(config))
+            self.client.setex(key, ttl, json.dumps(data))
             print(f"[REDIS_CLIENT] [INFO] Config de sesion cacheada: {session_id}")
             return True
         except Exception as e:
@@ -77,59 +98,45 @@ class RedisClient:
         try:
             key = f"session_config:{session_id}"
             self.client.delete(key)
-            print(f"[REDIS_CLIENT] [INFO] Config de sesion eliminada: {session_id}")
+            print(f"[REDIS_CLIENT] [INFO] Cache de config eliminado para sesion: {session_id}")
             return True
         except Exception as e:
-            print(f"[REDIS_CLIENT] [ERROR] Error eliminando config de sesion: {str(e)}")
+            print(f"[REDIS_CLIENT] [ERROR] Error eliminando cache de config: {str(e)}")
             return False
 
-    def _generate_content_key(
-        self,
-        topic: str,
-        intervention_type: str,
-        cognitive_event: str
-    ) -> str:
-        key_string = f"{topic}:{intervention_type}:{cognitive_event}"
-        hash_value = hashlib.md5(key_string.encode()).hexdigest()
-        return f"generated_content:{hash_value}"
-
-    def get_generated_content(
-        self,
-        topic: str,
-        intervention_type: str,
-        cognitive_event: str
-    ) -> Optional[str]:
+    def get_generated_content(self, topic: str, content_type: str, cognitive_event: str) -> Optional[str]:
         if not self._is_available():
             return None
         try:
-            key = self._generate_content_key(topic, intervention_type, cognitive_event)
-            content = self.client.get(key)
-            if content:
-                print(f"[REDIS_CLIENT] [INFO] Cache hit para contenido generado: {topic[:30]}...")
-                return content
+            cache_key = self._generate_content_key(topic, content_type, cognitive_event)
+            key = f"generated_content:{cache_key}"
+            data = self.client.get(key)
+            if data:
+                print(f"[REDIS_CLIENT] [INFO] Cache hit para contenido generado")
+                return data
             return None
         except Exception as e:
             print(f"[REDIS_CLIENT] [ERROR] Error obteniendo contenido generado: {str(e)}")
             return None
 
-    def set_generated_content(
-        self,
-        topic: str,
-        intervention_type: str,
-        cognitive_event: str,
-        content: str,
-        ttl: int = 3600
-    ) -> bool:
+    def set_generated_content(self, topic: str, content_type: str, cognitive_event: str, content: str, ttl: int = None) -> bool:
         if not self._is_available():
             return False
         try:
-            key = self._generate_content_key(topic, intervention_type, cognitive_event)
+            if ttl is None:
+                ttl = GENERATED_CONTENT_CACHE_TTL
+            cache_key = self._generate_content_key(topic, content_type, cognitive_event)
+            key = f"generated_content:{cache_key}"
             self.client.setex(key, ttl, content)
-            print(f"[REDIS_CLIENT] [INFO] Contenido generado cacheado: {topic[:30]}...")
+            print(f"[REDIS_CLIENT] [INFO] Contenido generado cacheado")
             return True
         except Exception as e:
             print(f"[REDIS_CLIENT] [ERROR] Error cacheando contenido generado: {str(e)}")
             return False
+
+    def _generate_content_key(self, topic: str, content_type: str, cognitive_event: str) -> str:
+        combined = f"{topic}:{content_type}:{cognitive_event}"
+        return hashlib.md5(combined.encode()).hexdigest()
 
     def increment_gemini_calls(self) -> int:
         if not self._is_available():
@@ -177,6 +184,37 @@ class RedisClient:
         except Exception as e:
             print(f"[REDIS_CLIENT] [ERROR] Error guardando estado circuit breaker: {str(e)}")
             return False
+
+    def store_intervention_evaluation(self, intervention_id: str, evaluation: Dict[str, Any]) -> bool:
+        if not self._is_available():
+            return False
+        try:
+            key = f"intervention_eval:{intervention_id}"
+            self.client.setex(key, 86400, json.dumps(evaluation))
+            return True
+        except Exception as e:
+            print(f"[REDIS_CLIENT] [ERROR] Error almacenando evaluacion: {str(e)}")
+            return False
+
+    def get_intervention_evaluations_for_topic(self, topic: str, limit: int = 10) -> list:
+        if not self._is_available():
+            return []
+        try:
+            pattern = f"intervention_eval:*"
+            keys = self.client.keys(pattern)
+            evaluations = []
+            for key in keys[:limit * 2]:
+                data = self.client.get(key)
+                if data:
+                    eval_data = json.loads(data)
+                    if eval_data.get("topic") == topic:
+                        evaluations.append(eval_data)
+                        if len(evaluations) >= limit:
+                            break
+            return evaluations
+        except Exception as e:
+            print(f"[REDIS_CLIENT] [ERROR] Error obteniendo evaluaciones: {str(e)}")
+            return []
 
     def close(self):
         pass

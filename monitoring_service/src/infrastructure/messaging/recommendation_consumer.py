@@ -3,6 +3,7 @@ import asyncio
 import threading
 import pika
 import time
+import uuid
 from typing import Optional, Dict, Any, List
 from concurrent.futures import ThreadPoolExecutor
 from src.infrastructure.config.settings import (
@@ -17,6 +18,10 @@ from src.infrastructure.cache.redis_client import RedisClient
 
 
 class RecommendationConsumer:
+    MAX_RETRY_COUNT = 5
+    RETRY_DELAY_BASE = 1.0
+    MESSAGE_TTL_SECONDS = 300
+
     def __init__(self):
         self.connection_manager = ConnectionManager()
         self.redis_client = RedisClient()
@@ -61,6 +66,10 @@ class RecommendationConsumer:
                 self._channel = self._connection.channel()
 
                 self._channel.queue_declare(queue=RECOMMENDATIONS_QUEUE, durable=True)
+                
+                dlq_name = f"{RECOMMENDATIONS_QUEUE}_dlq"
+                self._channel.queue_declare(queue=dlq_name, durable=True)
+                
                 self._channel.basic_qos(prefetch_count=RECOMMENDATION_PREFETCH_COUNT)
 
                 self._channel.basic_consume(
@@ -78,37 +87,51 @@ class RecommendationConsumer:
                     time.sleep(5)
 
     def _on_message(self, ch, method, properties, body) -> None:
-        self.executor.submit(self._process_message, ch, method, body)
+        self.executor.submit(self._process_message, ch, method, properties, body)
 
-    def _process_message(self, ch, method, body) -> None:
+    def _process_message(self, ch, method, properties, body) -> None:
+        message_id = None
         try:
             message = json.loads(body)
             session_id = message.get("session_id")
+            message_id = message.get("message_id") or str(uuid.uuid4())
+            message["message_id"] = message_id
 
             if not session_id:
                 print(f"[RECOMMENDATION_CONSUMER] [WARNING] Mensaje sin session_id")
                 self._safe_ack(ch, method.delivery_tag)
                 return
 
+            retry_count = self.redis_client.get_message_retry_count(message_id)
+            if retry_count >= self.MAX_RETRY_COUNT:
+                print(f"[RECOMMENDATION_CONSUMER] [WARNING] Mensaje excedio max reintentos, enviando a DLQ: {message_id}")
+                self._send_to_dlq(message)
+                self._safe_ack(ch, method.delivery_tag)
+                return
+
             states = self.connection_manager.get_all_states_by_session_id(session_id)
 
             if not states:
-                print(f"[RECOMMENDATION_CONSUMER] [WARNING] No hay conexiones locales para sesion: {session_id}")
-                
-                connections = self.redis_client.get_all_connections_for_session(session_id)
+                target_instance = self.redis_client.get_target_instance_for_session(session_id)
                 local_instance = self.redis_client.get_instance_id()
+
+                if target_instance and target_instance != local_instance:
+                    success = self.redis_client.publish_to_instance(target_instance, message)
+                    if success:
+                        print(f"[RECOMMENDATION_CONSUMER] [INFO] Mensaje reenviado via Redis Pub/Sub a instancia: {target_instance}")
+                        self._safe_ack(ch, method.delivery_tag)
+                        return
+
+                self.redis_client.increment_message_retry(message_id)
                 
-                is_for_this_instance = any(
-                    conn.get("instance_id") == local_instance 
-                    for conn in connections
-                )
-                
-                if not is_for_this_instance and connections:
-                    print(f"[RECOMMENDATION_CONSUMER] [INFO] Mensaje para otra instancia, requeue")
+                if retry_count < 3:
+                    print(f"[RECOMMENDATION_CONSUMER] [INFO] No hay conexiones locales, requeue (intento {retry_count + 1})")
+                    time.sleep(self.RETRY_DELAY_BASE * (retry_count + 1))
                     self._safe_nack(ch, method.delivery_tag, requeue=True)
-                    return
-                
-                self._safe_ack(ch, method.delivery_tag)
+                else:
+                    print(f"[RECOMMENDATION_CONSUMER] [WARNING] Almacenando recomendacion pendiente para sesion: {session_id}")
+                    self.redis_client.store_pending_recommendation(session_id, message, self.MESSAGE_TTL_SECONDS)
+                    self._safe_ack(ch, method.delivery_tag)
                 return
 
             recommendation_message = json.dumps({
@@ -124,63 +147,109 @@ class RecommendationConsumer:
 
             sent_count = 0
             failed_count = 0
-            
+
             for state in states:
                 if state.is_ready:
-                    success = self._send_to_websocket_with_retry(state, recommendation_message)
+                    success = self._send_to_websocket_with_confirmation(state, recommendation_message)
                     if success:
                         sent_count += 1
+                        self.redis_client.track_websocket_metric("sent", state.activity_uuid)
                     else:
                         failed_count += 1
+                        self.redis_client.track_websocket_metric("failed", state.activity_uuid)
 
             if sent_count > 0:
                 print(f"[RECOMMENDATION_CONSUMER] [INFO] Recomendacion enviada a {sent_count}/{len(states)} conexiones")
                 self._safe_ack(ch, method.delivery_tag)
             elif failed_count > 0 and sent_count == 0:
-                print(f"[RECOMMENDATION_CONSUMER] [WARNING] Fallo envio a todas las conexiones, requeue")
-                self._safe_nack(ch, method.delivery_tag, requeue=True)
+                self.redis_client.increment_message_retry(message_id)
+                if retry_count < self.MAX_RETRY_COUNT - 1:
+                    print(f"[RECOMMENDATION_CONSUMER] [WARNING] Fallo envio a todas las conexiones, requeue")
+                    self._safe_nack(ch, method.delivery_tag, requeue=True)
+                else:
+                    print(f"[RECOMMENDATION_CONSUMER] [WARNING] Fallo envio, enviando a DLQ")
+                    self._send_to_dlq(message)
+                    self._safe_ack(ch, method.delivery_tag)
             else:
                 self._safe_ack(ch, method.delivery_tag)
 
         except Exception as e:
             print(f"[RECOMMENDATION_CONSUMER] [ERROR] Error procesando recomendacion: {str(e)}")
+            if message_id:
+                self.redis_client.increment_message_retry(message_id)
             self._safe_nack(ch, method.delivery_tag, requeue=True)
 
-    def _send_to_websocket_with_retry(self, state, message: str) -> bool:
+    def _send_to_websocket_with_confirmation(self, state, message: str) -> bool:
         for attempt in range(self._max_retries):
-            success = self._send_to_websocket(state, message)
+            success = self._send_to_websocket_sync(state, message)
             if success:
                 return True
-            
+
             if attempt < self._max_retries - 1:
-                time.sleep(self._retry_delay * (attempt + 1))
+                delay = self._retry_delay * (attempt + 1)
+                time.sleep(delay)
                 print(f"[RECOMMENDATION_CONSUMER] [INFO] Reintentando envio (intento {attempt + 2}/{self._max_retries})")
-        
+
         return False
 
-    def _send_to_websocket(self, state, message: str) -> bool:
+    def _send_to_websocket_sync(self, state, message: str) -> bool:
         try:
             if self._loop is None:
                 print(f"[RECOMMENDATION_CONSUMER] [ERROR] Event loop no configurado")
                 return False
-            
+
             if not self._loop.is_running():
                 print(f"[RECOMMENDATION_CONSUMER] [ERROR] Event loop no esta corriendo")
                 return False
 
             future = asyncio.run_coroutine_threadsafe(
-                state.websocket.send_text(message),
+                self._async_send_with_timeout(state.websocket, message),
                 self._loop
             )
-            future.result(timeout=10.0)
-            print(f"[RECOMMENDATION_CONSUMER] [INFO] Recomendacion enviada a actividad: {state.activity_uuid}")
-            return True
+            
+            result = future.result(timeout=15.0)
+            
+            if result:
+                print(f"[RECOMMENDATION_CONSUMER] [INFO] Recomendacion enviada a actividad: {state.activity_uuid}")
+            
+            return result
+
         except asyncio.TimeoutError:
             print(f"[RECOMMENDATION_CONSUMER] [ERROR] Timeout enviando por WebSocket")
             return False
         except Exception as e:
             print(f"[RECOMMENDATION_CONSUMER] [ERROR] Error enviando por WebSocket: {str(e)}")
             return False
+
+    async def _async_send_with_timeout(self, websocket, message: str) -> bool:
+        try:
+            await asyncio.wait_for(
+                websocket.send_text(message),
+                timeout=10.0
+            )
+            return True
+        except asyncio.TimeoutError:
+            return False
+        except Exception as e:
+            print(f"[RECOMMENDATION_CONSUMER] [ERROR] Error en async send: {str(e)}")
+            return False
+
+    def _send_to_dlq(self, message: Dict[str, Any]) -> None:
+        try:
+            channel = self._get_publish_channel()
+            if channel:
+                dlq_name = f"{RECOMMENDATIONS_QUEUE}_dlq"
+                message["dlq_reason"] = "max_retries_exceeded"
+                message["dlq_timestamp"] = time.time()
+                channel.basic_publish(
+                    exchange='',
+                    routing_key=dlq_name,
+                    body=json.dumps(message),
+                    properties=pika.BasicProperties(delivery_mode=2)
+                )
+                print(f"[RECOMMENDATION_CONSUMER] [INFO] Mensaje enviado a DLQ: {dlq_name}")
+        except Exception as e:
+            print(f"[RECOMMENDATION_CONSUMER] [ERROR] Error enviando a DLQ: {str(e)}")
 
     def _safe_ack(self, ch, delivery_tag) -> None:
         try:

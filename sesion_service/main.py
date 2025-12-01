@@ -10,13 +10,16 @@ from src.infrastructure.config.settings import (
     ACTIVITY_DETAILS_RESPONSE_QUEUE,
     SESSION_CONFIG_REQUEST_QUEUE,
     SESSION_CONFIG_RESPONSE_QUEUE,
-    MONITORING_WEBSOCKET_EVENTS_QUEUE
+    MONITORING_WEBSOCKET_EVENTS_QUEUE,
+    LOG_SERVICE_QUEUE,
+    CACHE_INVALIDATION_QUEUE
 )
 from src.infrastructure.persistence.database import create_tables, engine
 from src.infrastructure.messaging.rabbitmq_client import RabbitMQClient
 from src.infrastructure.messaging.activity_details_consumer import ActivityDetailsConsumer
 from src.infrastructure.messaging.websocket_event_consumer import WebsocketEventConsumer
 from src.infrastructure.messaging.session_config_consumer import SessionConfigConsumer
+from src.infrastructure.messaging.queue_validator import validate_service_queues
 from src.presentation.controllers.session_controller import router as session_router
 from src.presentation.controllers.activity_controller import router as activity_router
 from src.presentation.routes.health_routes import router as health_router
@@ -68,23 +71,62 @@ def validate_database_connection() -> bool:
         return False
 
 
-def validate_rabbitmq_connection() -> bool:
-    try:
-        client = RabbitMQClient()
-        client.close()
-        print(f"[MAIN] [INFO] Conexion a RabbitMQ verificada")
-        return True
-    except Exception as e:
-        print(f"[MAIN] [ERROR] Error conectando a RabbitMQ: {str(e)}")
-        return False
+def validate_rabbitmq_and_queues() -> bool:
+    required_queues = [
+        {
+            "name": ACTIVITY_DETAILS_REQUEST_QUEUE,
+            "with_dlq": False
+        },
+        {
+            "name": ACTIVITY_DETAILS_RESPONSE_QUEUE,
+            "with_dlq": False
+        },
+        {
+            "name": SESSION_CONFIG_REQUEST_QUEUE,
+            "with_dlq": False
+        },
+        {
+            "name": SESSION_CONFIG_RESPONSE_QUEUE,
+            "with_dlq": False
+        },
+        {
+            "name": MONITORING_WEBSOCKET_EVENTS_QUEUE,
+            "with_dlq": False
+        },
+        {
+            "name": LOG_SERVICE_QUEUE,
+            "with_dlq": False
+        },
+        {
+            "name": CACHE_INVALIDATION_QUEUE,
+            "with_dlq": False
+        }
+    ]
+
+    is_valid, results = validate_service_queues(required_queues, create_missing=True)
+
+    if is_valid:
+        print(f"[MAIN] [INFO] Validacion de colas completada:")
+        for queue_info in results.get("queues", []):
+            status = queue_info.get("status", "unknown")
+            name = queue_info.get("name")
+            consumers = queue_info.get("consumer_count", 0)
+            messages = queue_info.get("message_count", 0)
+            print(f"  - {name}: {status} (consumers={consumers}, messages={messages})")
+    else:
+        print(f"[MAIN] [ERROR] Validacion de colas fallida")
+        for error in results.get("errors", []):
+            print(f"  - {error}")
+
+    return is_valid
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global rabbitmq_client, activity_details_consumer, websocket_event_consumer, session_config_consumer
-    
+
     print(f"[MAIN] [INFO] Iniciando {SERVICE_NAME}...")
-    
+
     print(f"[MAIN] [INFO] Validando configuracion...")
     if not validate_configuration():
         print(f"[MAIN] [ERROR] Configuracion invalida, abortando inicio")
@@ -95,9 +137,9 @@ async def lifespan(app: FastAPI):
         print(f"[MAIN] [ERROR] No se pudo conectar a la base de datos, abortando inicio")
         sys.exit(1)
 
-    print(f"[MAIN] [INFO] Verificando conexion a RabbitMQ...")
-    if not validate_rabbitmq_connection():
-        print(f"[MAIN] [ERROR] No se pudo conectar a RabbitMQ, abortando inicio")
+    print(f"[MAIN] [INFO] Verificando RabbitMQ y colas...")
+    if not validate_rabbitmq_and_queues():
+        print(f"[MAIN] [ERROR] No se pudo validar RabbitMQ o las colas, abortando inicio")
         sys.exit(1)
 
     create_tables()

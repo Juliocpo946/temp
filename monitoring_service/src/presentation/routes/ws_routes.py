@@ -16,17 +16,17 @@ websocket_publisher = WebsocketEventPublisher(rabbitmq_client)
 async def websocket_endpoint(websocket: WebSocket, session_id: str, activity_uuid: str):
     state = await manager.connect(websocket, session_id, activity_uuid)
     db = SessionLocal()
-    
+
     try:
-        handler = FrameHandler(db)
-        
+        handler = FrameHandler(db, rabbitmq_client)
+
         while True:
             raw_message = await websocket.receive_text()
             result = await handler.handle(state, raw_message)
-            
+
             if result:
                 await websocket.send_text(json.dumps(result))
-                
+
     except WebSocketDisconnect:
         disconnected_state = manager.disconnect(activity_uuid)
         if disconnected_state:

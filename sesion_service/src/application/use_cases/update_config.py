@@ -1,6 +1,7 @@
 from src.domain.repositories.analysis_config_repository import AnalysisConfigRepository
 from src.infrastructure.messaging.rabbitmq_client import RabbitMQClient
-from src.infrastructure.config.settings import LOG_SERVICE_QUEUE
+from src.infrastructure.config.settings import LOG_SERVICE_QUEUE, CACHE_INVALIDATION_QUEUE
+
 
 class UpdateConfigUseCase:
     def __init__(
@@ -34,9 +35,23 @@ class UpdateConfigUseCase:
         )
         self.config_repo.update(config)
 
+        self._publish_cache_invalidation(session_id)
+
         self._publish_log(f"Configuracion actualizada para sesion: {session_id}")
 
         return {'status': 'ok'}
+
+    def _publish_cache_invalidation(self, session_id: str) -> None:
+        invalidation_message = {
+            'action': 'invalidate_session_config',
+            'session_id': session_id,
+            'key': f"session_config:{session_id}"
+        }
+        try:
+            self.rabbitmq_client.publish(CACHE_INVALIDATION_QUEUE, invalidation_message)
+            self._publish_log(f"Evento de invalidacion de cache publicado para sesion: {session_id}")
+        except Exception as e:
+            self._publish_log(f"Error publicando invalidacion de cache: {str(e)}", "error")
 
     def _publish_log(self, message: str, level: str = "info") -> None:
         log_message = {
