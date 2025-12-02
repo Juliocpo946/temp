@@ -9,14 +9,20 @@ class InterventionClassifier:
     def __init__(self):
         self.model_loader = ModelLoader()
 
+    # RENOMBRADO: de classify a predict para coincidir con el caso de uso
     def predict(
         self,
         sequence: np.ndarray,
         context: np.ndarray
     ) -> Tuple[InterventionType, float]:
-        predicted_class, confidence = self.model_loader.predict(sequence, context)
-        intervention_type = InterventionType.from_prediction(predicted_class)
-        return intervention_type, confidence
+        try:
+            predicted_class, confidence = self.model_loader.predict(sequence, context)
+            intervention_type = InterventionType.from_prediction(predicted_class)
+            return intervention_type, confidence
+        except Exception as e:
+            print(f"[CLASSIFIER] [ERROR] Error en prediccion: {e}")
+            # En caso de error, fallar seguro a "no intervención"
+            return InterventionType.NO_INTERVENTION, 0.0
 
     def should_intervene(
         self,

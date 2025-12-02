@@ -159,6 +159,15 @@ class ConnectionState:
             "max_buffer_size": self.MAX_BUFFER_SIZE
         }
 
+    async def send_personal_message(self, message: Dict, activity_uuid: str):
+        # Implementación básica para enviar mensaje por WS
+        try:
+            await self.websocket.send_json(message)
+            return True
+        except Exception as e:
+            print(f"[CONNECTION_STATE] [ERROR] Error enviando mensaje WS: {e}")
+            return False
+
 
 class ConnectionManager:
     _instance = None
@@ -199,6 +208,15 @@ class ConnectionManager:
 
     def get_state(self, activity_uuid: str) -> Optional[ConnectionState]:
         return self.active_connections.get(activity_uuid)
+        
+    def has_connection(self, activity_uuid: str) -> bool:
+        return activity_uuid in self.active_connections
+
+    async def send_personal_message(self, message: Dict, activity_uuid: str):
+        if activity_uuid in self.active_connections:
+            state = self.active_connections[activity_uuid]
+            return await state.send_personal_message(message, activity_uuid)
+        return False
 
     def get_state_by_session_id(self, session_id: str) -> Optional[ConnectionState]:
         for state in self.active_connections.values():
@@ -232,3 +250,6 @@ class ConnectionManager:
     @property
     def connection_count(self) -> int:
         return len(self.active_connections)
+
+# Instancia global exportada
+manager = ConnectionManager()

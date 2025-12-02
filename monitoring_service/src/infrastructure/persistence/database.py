@@ -16,5 +16,11 @@ def get_db():
 
 
 def create_tables():
+    # IMPORTANTE: Importar los modelos aquí para que se registren en Base.metadata
+    # antes de llamar a create_all
+    import src.infrastructure.persistence.models.intervention_model
+    import src.infrastructure.persistence.models.training_sample_model
+    import src.infrastructure.persistence.models.state_transition_model
+    
     Base.metadata.create_all(bind=engine)
     print(f"[DATABASE] [INFO] Tablas creadas exitosamente")

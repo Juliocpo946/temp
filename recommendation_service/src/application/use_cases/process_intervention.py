@@ -38,6 +38,8 @@ class ProcessInterventionUseCase:
         self.redis_client = redis_client
 
     def execute(self, event: MonitoringEventDTO) -> Optional[Dict[str, Any]]:
+        # AQUI estaba el error: llamaba a get_session_config, pero el cliente tenía request_session_config
+        # Ahora que actualizamos el cliente, esto funcionará correctamente.
         config = self.session_config_client.get_session_config(event.session_id)
 
         if not config.get("cognitive_analysis_enabled", True):

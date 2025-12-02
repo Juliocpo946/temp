@@ -26,6 +26,28 @@ class MonitoringEventDTO:
         self.context = context
         self.timestamp = timestamp
 
+    # --- PROPIEDADES ALIAS (Corrección para compatibilidad) ---
+    @property
+    def evento_cognitivo(self) -> str:
+        return self.cognitive_event
+
+    @property
+    def accion_sugerida(self) -> str:
+        return self.suggested_action
+
+    @property
+    def precision_cognitiva(self) -> float:
+        return self.cognitive_precision
+
+    @property
+    def confianza(self) -> float:
+        return self.confidence
+
+    @property
+    def contexto(self) -> Dict[str, Any]:
+        return self.context
+    # ---------------------------------------------------------
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "MonitoringEventDTO":
         return cls(

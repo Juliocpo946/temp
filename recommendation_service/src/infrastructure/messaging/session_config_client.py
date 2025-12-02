@@ -41,7 +41,6 @@ class SessionConfigClient:
 
         thread = threading.Thread(target=self._consume_responses, daemon=True)
         thread.start()
-        self._response_consumer_started = True
         print(f"[SESSION_CONFIG_CLIENT] [INFO] Consumer de respuestas iniciado en cola: {self._response_queue}")
 
     def _consume_responses(self) -> None:
@@ -92,12 +91,13 @@ class SessionConfigClient:
                 if self.redis_client:
                     session_id = message.get("session_id")
                     if session_id:
-                        self.redis_client.store_session_config(session_id, config, ttl=CACHE_TTL)
+                        # CORRECCIÓN: Usar set_session_config en lugar de store_session_config
+                        self.redis_client.set_session_config(session_id, config, ttl=CACHE_TTL)
 
         except Exception as e:
             print(f"[SESSION_CONFIG_CLIENT] [ERROR] Error procesando respuesta: {str(e)}")
 
-    def request_session_config(self, session_id: int) -> Dict[str, Any]:
+    def get_session_config(self, session_id: str) -> Dict[str, Any]:
         if self.redis_client:
             cached = self.redis_client.get_session_config(session_id)
             if cached:
