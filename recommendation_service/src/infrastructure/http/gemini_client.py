@@ -197,9 +197,10 @@ EJEMPLOS DE FORMATO CORRECTO:
 
 Genera SOLO la instruccion, sin explicaciones:"""
 
+            # Actualización para compatibilidad con versiones nuevas del SDK
             response = self.model.generate_content(
                 prompt_text,
-                generation_config=genai.types.GenerationConfig(
+                generation_config=genai.GenerationConfig(
                     candidate_count=1,
                     max_output_tokens=50
                 )
