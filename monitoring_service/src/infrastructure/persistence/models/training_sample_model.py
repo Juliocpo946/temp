@@ -12,7 +12,7 @@ class TrainingSampleModel(Base):
     external_activity_id = Column(String(50), nullable=False)
     window_data = Column(JSON, nullable=False)
     context_data = Column(JSON, nullable=False)
-    label = Column(Integer, nullable=False)
+    label = Column(String(50), nullable=False)  # CAMBIADO de Integer a String
     source = Column(String(20), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     used_in_training = Column(Boolean, default=False, nullable=False)

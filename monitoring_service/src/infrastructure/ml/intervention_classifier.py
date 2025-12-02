@@ -9,7 +9,7 @@ class InterventionClassifier:
     def __init__(self):
         self.model_loader = ModelLoader()
 
-    def classify(
+    def predict(
         self,
         sequence: np.ndarray,
         context: np.ndarray

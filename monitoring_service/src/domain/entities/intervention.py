@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional, Dict, Any
+from typing import Optional
 import uuid
 
 class Intervention:
@@ -8,27 +8,29 @@ class Intervention:
         id: Optional[uuid.UUID],
         session_id: uuid.UUID,
         activity_uuid: uuid.UUID,
+        user_id: int,
         external_activity_id: int,
         intervention_type: str,
+        cognitive_event: str,
         confidence: float,
-        triggered_at: datetime,
-        window_snapshot: Dict[str, Any],
-        context_snapshot: Dict[str, Any],
-        result: str = "pending",
-        result_evaluated_at: Optional[datetime] = None
+        precision: float,
+        triggered_at: datetime,  # RENOMBRADO de created_at
+        result: Optional[str] = "pending",
+        evaluated_at: Optional[datetime] = None
     ):
         self.id = id or uuid.uuid4()
         self.session_id = session_id
         self.activity_uuid = activity_uuid
+        self.user_id = user_id
         self.external_activity_id = external_activity_id
         self.intervention_type = intervention_type
+        self.cognitive_event = cognitive_event
         self.confidence = confidence
+        self.precision = precision
         self.triggered_at = triggered_at
-        self.window_snapshot = window_snapshot
-        self.context_snapshot = context_snapshot
         self.result = result
-        self.result_evaluated_at = result_evaluated_at
+        self.evaluated_at = evaluated_at
 
     def evaluate_result(self, result: str) -> None:
         self.result = result
-        self.result_evaluated_at = datetime.utcnow()
+        self.evaluated_at = datetime.utcnow()

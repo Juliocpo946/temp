@@ -10,7 +10,7 @@ class TrainingSample:
         external_activity_id: int,
         window_data: Dict[str, Any],
         context_data: Dict[str, Any],
-        label: int,
+        label: str,  # CAMBIADO a str para soportar "no_intervention"
         source: str,
         created_at: Optional[datetime] = None,
         used_in_training: bool = False

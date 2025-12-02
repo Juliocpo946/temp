@@ -14,14 +14,15 @@ class InterventionRepository:
             id=str(intervention.id),
             session_id=str(intervention.session_id),
             activity_uuid=str(intervention.activity_uuid),
-            external_activity_id=str(intervention.external_activity_id),
+            user_id=intervention.user_id,
+            external_activity_id=intervention.external_activity_id,
             intervention_type=intervention.intervention_type,
+            cognitive_event=intervention.cognitive_event,
             confidence=intervention.confidence,
+            precision=intervention.precision,
             triggered_at=intervention.triggered_at,
-            window_snapshot=intervention.window_snapshot,
-            context_snapshot=intervention.context_snapshot,
             result=intervention.result,
-            result_evaluated_at=intervention.result_evaluated_at
+            result_evaluated_at=intervention.evaluated_at
         )
         self.db.add(db_intervention)
         self.db.commit()
@@ -53,7 +54,7 @@ class InterventionRepository:
         ).first()
         if db_intervention:
             db_intervention.result = intervention.result
-            db_intervention.result_evaluated_at = intervention.result_evaluated_at
+            db_intervention.result_evaluated_at = intervention.evaluated_at
             self.db.commit()
             self.db.refresh(db_intervention)
             return self._to_domain(db_intervention)
@@ -65,12 +66,13 @@ class InterventionRepository:
             id=uuid.UUID(db_intervention.id),
             session_id=uuid.UUID(db_intervention.session_id),
             activity_uuid=uuid.UUID(db_intervention.activity_uuid),
+            user_id=db_intervention.user_id,
             external_activity_id=int(db_intervention.external_activity_id),
             intervention_type=db_intervention.intervention_type,
+            cognitive_event=db_intervention.cognitive_event,
             confidence=db_intervention.confidence,
+            precision=db_intervention.precision,
             triggered_at=db_intervention.triggered_at,
-            window_snapshot=db_intervention.window_snapshot,
-            context_snapshot=db_intervention.context_snapshot,
             result=db_intervention.result,
-            result_evaluated_at=db_intervention.result_evaluated_at
+            evaluated_at=db_intervention.result_evaluated_at
         )
