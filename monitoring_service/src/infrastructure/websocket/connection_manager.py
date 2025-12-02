@@ -27,10 +27,11 @@ class BackpressureMetrics:
 
 
 class ConnectionState:
-    MAX_BUFFER_SIZE = 50
-    THROTTLE_THRESHOLD = 40
-    THROTTLE_DURATION_SECONDS = 5
-    MAX_FRAMES_PER_SECOND = 30
+    # CORRECCION: Aumentados limites significativamente para evitar warnings constantes
+    MAX_BUFFER_SIZE = 300
+    THROTTLE_THRESHOLD = 250
+    THROTTLE_DURATION_SECONDS = 2
+    MAX_FRAMES_PER_SECOND = 60
 
     def __init__(self, websocket: WebSocket, session_id: str, activity_uuid: str):
         self.websocket = websocket

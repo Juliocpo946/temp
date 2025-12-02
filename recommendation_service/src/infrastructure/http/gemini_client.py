@@ -104,6 +104,7 @@ class CircuitBreaker:
 class GeminiClient:
     def __init__(self, redis_client: Optional[RedisClient] = None):
         genai.configure(api_key=GEMINI_API_KEY)
+        # CORRECCIÓN: Usar versión específica '002' que es estable en v1beta
         self.model = genai.GenerativeModel('gemini-1.5-flash')
         self.lsm_prompt = LSMPromptLoader.load()
         self.redis_client = redis_client
@@ -197,7 +198,6 @@ EJEMPLOS DE FORMATO CORRECTO:
 
 Genera SOLO la instruccion, sin explicaciones:"""
 
-            # Actualización para compatibilidad con versiones nuevas del SDK
             response = self.model.generate_content(
                 prompt_text,
                 generation_config=genai.GenerationConfig(
