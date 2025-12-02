@@ -2,6 +2,7 @@ import sys
 from contextlib import asynccontextmanager
 from sqlalchemy import text
 from fastapi import FastAPI
+from sqlalchemy import text  # <--- IMPORTANTE: Agregar esto
 from src.infrastructure.config.settings import (
     SERVICE_PORT,
     SERVICE_NAME,

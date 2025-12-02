@@ -14,7 +14,11 @@ def get_db():
     finally:
         db.close()
 
-
 def create_tables():
+    from src.infrastructure.persistence.models.session_model import SessionModel
+    from src.infrastructure.persistence.models.activity_log_model import ActivityLogModel
+    from src.infrastructure.persistence.models.analysis_config_model import AnalysisConfigModel
+    from src.infrastructure.persistence.models.external_activity_model import ExternalActivityModel
+    from src.infrastructure.persistence.models.pause_log_model import PauseLogModel
+
     Base.metadata.create_all(bind=engine)
-    print(f"[DATABASE] [INFO] Tablas creadas exitosamente")

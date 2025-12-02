@@ -1,7 +1,10 @@
 import aiosmtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from src.infrastructure.config.settings import SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, SMTP_FROM_EMAIL, SMTP_FROM_NAME
+from email.message import EmailMessage
+from src.infrastructure.config.settings import (
+    SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD,
+    SMTP_FROM_EMAIL, SMTP_FROM_NAME
+)
+
 
 class SMTPClient:
     def __init__(self):
@@ -12,21 +15,28 @@ class SMTPClient:
         self.from_email = SMTP_FROM_EMAIL
         self.from_name = SMTP_FROM_NAME
 
-    async def send_email(self, to_email: str, subject: str, html_body: str) -> bool:
+
+    async def send_email(self, to_email: str, subject: str, html_body: str):
+        message = EmailMessage()
+        message["From"] = f"{self.from_name} <{self.from_email}>"
+        message["To"] = to_email
+        message["Subject"] = subject
+
+
+        message.set_content(html_body, subtype="html")
+
         try:
-            message = MIMEMultipart("alternative")
-            message["Subject"] = subject
-            message["From"] = f"{self.from_name} <{self.from_email}>"
-            message["To"] = to_email
-
-            part = MIMEText(html_body, "html")
-            message.attach(part)
-
-            async with aiosmtplib.SMTP(hostname=self.host, port=self.port, use_tls=True) as smtp:
-                await smtp.login(self.user, self.password)
-                await smtp.sendmail(self.from_email, to_email, message.as_string())
-            
+            await aiosmtplib.send(
+                message,
+                hostname=self.host,
+                port=self.port,
+                username=self.user,
+                password=self.password,
+                use_tls=True,  # Correcto para puerto 465
+                start_tls=False
+            )
+            print(f"[SMTP] Correo enviado a {to_email}")
             return True
         except Exception as e:
-            print(f"Error al enviar email: {str(e)}")
+            print(f"[SMTP] Error enviando correo: {e}")
             return False
