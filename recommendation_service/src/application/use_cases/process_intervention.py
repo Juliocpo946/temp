@@ -38,8 +38,6 @@ class ProcessInterventionUseCase:
         self.redis_client = redis_client
 
     def execute(self, event: MonitoringEventDTO) -> Optional[Dict[str, Any]]:
-        # AQUI estaba el error: llamaba a get_session_config, pero el cliente tenía request_session_config
-        # Ahora que actualizamos el cliente, esto funcionará correctamente.
         config = self.session_config_client.get_session_config(event.session_id)
 
         if not config.get("cognitive_analysis_enabled", True):
@@ -55,6 +53,9 @@ class ProcessInterventionUseCase:
             return None
 
         activity_details = self._get_activity_details(event)
+        
+        # Extraer activity_uuid del contexto del evento
+        activity_uuid = event.contexto.get("activity_uuid") if event.contexto else None
 
         topic = activity_details.topic if activity_details else "general"
         content_type = self._determine_content_type(action, event.evento_cognitivo)
@@ -78,12 +79,16 @@ class ProcessInterventionUseCase:
             "action": action,
             "content": content,
             "vibration": vibration_pattern,
+            "contexto": {
+                "activity_uuid": activity_uuid
+            },
             "metadata": {
                 "cognitive_event": event.evento_cognitivo,
                 "precision": event.precision_cognitiva,
                 "confidence": event.confianza,
                 "topic": topic,
-                "content_type": content_type
+                "content_type": content_type,
+                "activity_uuid": activity_uuid
             },
             "timestamp": datetime.utcnow().isoformat()
         }

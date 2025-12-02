@@ -2,13 +2,12 @@ import json
 import traceback
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from src.infrastructure.persistence.database import SessionLocal
-from src.infrastructure.websocket.connection_manager import ConnectionManager
+from src.infrastructure.websocket.connection_manager import manager
 from src.infrastructure.websocket.frame_handler import FrameHandler
 from src.infrastructure.messaging.rabbitmq_client import RabbitMQClient
 from src.infrastructure.messaging.websocket_event_publisher import WebsocketEventPublisher
 
 router = APIRouter()
-manager = ConnectionManager()
 rabbitmq_client = RabbitMQClient()
 websocket_publisher = WebsocketEventPublisher(rabbitmq_client)
 

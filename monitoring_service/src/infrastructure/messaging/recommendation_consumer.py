@@ -22,6 +22,7 @@ class RecommendationConsumer:
 
     def set_event_loop(self, loop):
         self._loop = loop
+        print(f"[RECOMMENDATION_CONSUMER] [INFO] Event loop configurado: {loop}")
 
     def start(self) -> None:
         self._running = True
@@ -36,7 +37,6 @@ class RecommendationConsumer:
                 self._connection = pika.BlockingConnection(parameters)
                 self._channel = self._connection.channel()
                 
-                # CORRECCIÓN: Eliminados los argumentos de DLQ para evitar conflicto con la cola existente
                 self._channel.queue_declare(
                     queue=RECOMMENDATIONS_QUEUE, 
                     durable=True
@@ -69,33 +69,49 @@ class RecommendationConsumer:
             activity_uuid = message.get("contexto", {}).get("activity_uuid")
             
             if not activity_uuid:
-                 # Fallback: a veces viene en metadata
-                 activity_uuid = message.get("metadata", {}).get("activity_uuid")
+                # Fallback: a veces viene en metadata
+                activity_uuid = message.get("metadata", {}).get("activity_uuid")
 
-            if activity_uuid:
-                # Intentar enviar al WebSocket local
-                if self._loop and manager.has_connection(activity_uuid):
-                    future = asyncio.run_coroutine_threadsafe(
-                        manager.send_personal_message(message, activity_uuid),
-                        self._loop
-                    )
-                    try:
-                        future.result(timeout=2)
-                        print(f"[RECOMMENDATION_CONSUMER] [INFO] Enviado a WS local: {activity_uuid}")
-                    except Exception as e:
-                        print(f"[RECOMMENDATION_CONSUMER] [ERROR] Fallo envio WS: {e}")
-                else:
-                     # Si no está conectado localmente, logueamos y continuamos
-                     # En un entorno real distribuido, aquí podríamos intentar reenviar a otro nodo,
-                     # pero para este caso asumimos que si no está aquí, no está conectado.
-                     pass 
+            print(f"[RECOMMENDATION_CONSUMER] [DEBUG] Mensaje recibido - activity_uuid: {activity_uuid}")
+            print(f"[RECOMMENDATION_CONSUMER] [DEBUG] Loop configurado: {self._loop is not None}")
+            print(f"[RECOMMENDATION_CONSUMER] [DEBUG] Conexiones activas: {list(manager.active_connections.keys())}")
+
+            if not activity_uuid:
+                print(f"[RECOMMENDATION_CONSUMER] [WARNING] Mensaje sin activity_uuid, ignorando")
+                self._safe_ack(ch, method.delivery_tag)
+                return
+
+            has_conn = manager.has_connection(activity_uuid)
+            print(f"[RECOMMENDATION_CONSUMER] [DEBUG] has_connection({activity_uuid}): {has_conn}")
+
+            if self._loop and has_conn:
+                print(f"[RECOMMENDATION_CONSUMER] [DEBUG] ANTES - tiene type?: {'type' in message}")
+                message["type"] = "recommendation"
+                print(f"[RECOMMENDATION_CONSUMER] [DEBUG] Keys del mensaje: {list(message.keys())}")
+                print(f"[RECOMMENDATION_CONSUMER] [DEBUG] DESPUES - type es: {message.get('type')}")
+                print(f"[RECOMMENDATION_CONSUMER] [DEBUG] Mensaje a enviar: {json.dumps(message)[:200]}")
+                
+                future = asyncio.run_coroutine_threadsafe(
+                    manager.send_personal_message(message, activity_uuid),
+                    self._loop
+                )
+                try:
+                    result = future.result(timeout=2)
+                    print(f"[RECOMMENDATION_CONSUMER] [INFO] Enviado a WS local: {activity_uuid}, resultado: {result}")
+                except Exception as e:
+                    print(f"[RECOMMENDATION_CONSUMER] [ERROR] Fallo envio WS: {e}")
+            else:
+                if not self._loop:
+                    print(f"[RECOMMENDATION_CONSUMER] [WARNING] No hay event loop configurado")
+                if not has_conn:
+                    print(f"[RECOMMENDATION_CONSUMER] [WARNING] No hay conexion activa para: {activity_uuid}")
             
-            # Siempre hacer ACK para evitar bucles infinitos
             self._safe_ack(ch, method.delivery_tag)
 
         except Exception as e:
             print(f"[RECOMMENDATION_CONSUMER] [ERROR] Error procesando mensaje: {str(e)}")
-            # En caso de error, descartar (NACK sin requeue) para evitar bucles
+            import traceback
+            traceback.print_exc()
             self._safe_nack(ch, method.delivery_tag, requeue=False)
 
     def _safe_ack(self, ch, delivery_tag) -> None:
@@ -120,6 +136,6 @@ class RecommendationConsumer:
             if self._connection and not self._connection.is_closed:
                 self._connection.close()
         except Exception as e:
-             print(f"[RECOMMENDATION_CONSUMER] [ERROR] Error cerrando consumer: {str(e)}")
+            print(f"[RECOMMENDATION_CONSUMER] [ERROR] Error cerrando consumer: {str(e)}")
         self.executor.shutdown(wait=False)
         print(f"[RECOMMENDATION_CONSUMER] [INFO] Consumer de recomendaciones cerrado")
