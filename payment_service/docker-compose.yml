@@ -1,0 +1,13 @@
+services:
+  payment_service:
+    build: .
+    ports:
+      - "3005:3005"
+    env_file:
+      - .env
+    networks:
+      - microservices
+
+networks:
+  microservices:
+    external: true

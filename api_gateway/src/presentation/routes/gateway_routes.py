@@ -11,7 +11,8 @@ from src.infrastructure.config.settings import (
     RECOMMENDATION_SERVICE_URL,
     MONITORING_SERVICE_URL,
     MONITORING_SERVICE_WS_URL,
-    LOG_SERVICE_URL
+    LOG_SERVICE_URL,
+    PAYMENT_SERVICE_URL
 )
 
 router = APIRouter()
@@ -27,6 +28,7 @@ SERVICE_ROUTES = {
     "/recommendations": RECOMMENDATION_SERVICE_URL,
     "/monitoring": MONITORING_SERVICE_URL,
     "/logs": LOG_SERVICE_URL,
+    "/payments": PAYMENT_SERVICE_URL,
 }
 
 
@@ -168,6 +170,13 @@ async def proxy_logs(request: Request, path: str):
         return JSONResponse(status_code=503, content={"detail": "Log service no configurado"})
     return await proxy_request(request, LOG_SERVICE_URL, f"/logs/{path}")
 
+
+@router.api_route("/payments/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
+async def proxy_payments(request: Request, path: str):
+    if not PAYMENT_SERVICE_URL:
+        return JSONResponse(status_code=503, content={"detail": "Payment service no configurado"})
+
+    return await proxy_request(request, PAYMENT_SERVICE_URL, f"/payments/{path}")
 
 async def validate_api_key(api_key: str) -> dict:
     try:

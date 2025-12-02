@@ -4,7 +4,8 @@ from src.infrastructure.persistence.database import get_db
 from src.infrastructure.persistence.repositories.application_repository_impl import ApplicationRepositoryImpl
 from src.infrastructure.persistence.repositories.company_repository_impl import CompanyRepositoryImpl
 from src.infrastructure.persistence.repositories.api_key_repository_impl import ApiKeyRepositoryImpl
-from src.infrastructure.persistence.repositories.revocation_api_key_repository_impl import RevocationApiKeyRepositoryImpl
+from src.infrastructure.persistence.repositories.revocation_api_key_repository_impl import \
+    RevocationApiKeyRepositoryImpl
 from src.infrastructure.messaging.rabbitmq_client import RabbitMQClient
 from src.application.use_cases.create_application import CreateApplicationUseCase
 from src.application.use_cases.get_applications import GetApplicationsUseCase
@@ -12,28 +13,32 @@ from src.application.use_cases.get_application import GetApplicationUseCase
 from src.application.use_cases.generate_new_api_key import GenerateNewApiKeyUseCase
 from src.application.use_cases.request_revoke_api_key import RequestRevokeApiKeyUseCase
 from src.application.use_cases.confirm_revoke_api_key import ConfirmRevokeApiKeyUseCase
-from src.presentation.schemas.application_schema import ApplicationCreateSchema, ApiKeyResponseSchema, ConfirmRevokeSchema
+from src.presentation.schemas.application_schema import ApplicationCreateSchema, ApiKeyResponseSchema, \
+    ConfirmRevokeSchema
 from src.application.use_cases.get_application_api_keys import GetApplicationApiKeysUseCase
 import traceback
 
 router = APIRouter()
 rabbitmq_client = RabbitMQClient()
 
+
 @router.post("/")
 async def create_application(
-    application_data: ApplicationCreateSchema, 
-    db: Session = Depends(get_db),
-    x_company_id: str = Header(None, alias="X-Company-ID")
+        application_data: ApplicationCreateSchema,
+        db: Session = Depends(get_db),
+        x_company_id: str = Header(None, alias="X-Company-ID")
 ):
     try:
         if not x_company_id:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Company ID requerido")
-        
+
         application_repo = ApplicationRepositoryImpl(db)
         company_repo = CompanyRepositoryImpl(db)
-        api_key_repo = ApiKeyRepositoryImpl(db)
-        use_case = CreateApplicationUseCase(application_repo, company_repo, api_key_repo, rabbitmq_client)
-        result = use_case.execute(x_company_id, application_data.name, application_data.platform, application_data.environment)
+
+        # Ya no pasamos api_key_repo
+        use_case = CreateApplicationUseCase(application_repo, company_repo, rabbitmq_client)
+        result = use_case.execute(x_company_id, application_data.name, application_data.platform,
+                                  application_data.environment)
         return result
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
@@ -43,15 +48,16 @@ async def create_application(
         print(f"Error detallado: {traceback.format_exc()}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
+
 @router.get("/")
 async def get_applications(
-    db: Session = Depends(get_db),
-    x_company_id: str = Header(None, alias="X-Company-ID")
+        db: Session = Depends(get_db),
+        x_company_id: str = Header(None, alias="X-Company-ID")
 ):
     try:
         if not x_company_id:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Company ID requerido")
-        
+
         application_repo = ApplicationRepositoryImpl(db)
         use_case = GetApplicationsUseCase(application_repo, rabbitmq_client)
         result = use_case.execute(x_company_id)
@@ -61,6 +67,7 @@ async def get_applications(
     except Exception as e:
         print(f"Error detallado: {traceback.format_exc()}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
 
 @router.get("/{application_id}")
 async def get_application(application_id: str, db: Session = Depends(get_db)):
@@ -75,16 +82,17 @@ async def get_application(application_id: str, db: Session = Depends(get_db)):
         print(f"Error detallado: {traceback.format_exc()}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
+
 @router.post("/{application_id}/generate-key")
 async def generate_api_key(
-    application_id: str, 
-    db: Session = Depends(get_db),
-    x_company_id: str = Header(None, alias="X-Company-ID")
+        application_id: str,
+        db: Session = Depends(get_db),
+        x_company_id: str = Header(None, alias="X-Company-ID")
 ):
     try:
         if not x_company_id:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Company ID requerido")
-        
+
         application_repo = ApplicationRepositoryImpl(db)
         company_repo = CompanyRepositoryImpl(db)
         api_key_repo = ApiKeyRepositoryImpl(db)
@@ -99,6 +107,7 @@ async def generate_api_key(
         print(f"Error detallado: {traceback.format_exc()}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
+
 @router.post("/api-keys/{api_key_id}/request-revoke")
 async def request_revoke_api_key(api_key_id: str, db: Session = Depends(get_db)):
     try:
@@ -106,7 +115,8 @@ async def request_revoke_api_key(api_key_id: str, db: Session = Depends(get_db))
         application_repo = ApplicationRepositoryImpl(db)
         company_repo = CompanyRepositoryImpl(db)
         revocation_api_key_repo = RevocationApiKeyRepositoryImpl(db)
-        use_case = RequestRevokeApiKeyUseCase(api_key_repo, application_repo, company_repo, revocation_api_key_repo, rabbitmq_client)
+        use_case = RequestRevokeApiKeyUseCase(api_key_repo, application_repo, company_repo, revocation_api_key_repo,
+                                              rabbitmq_client)
         result = use_case.execute(api_key_id)
         return result
     except ValueError as e:
@@ -115,6 +125,7 @@ async def request_revoke_api_key(api_key_id: str, db: Session = Depends(get_db))
         print(f"Error detallado: {traceback.format_exc()}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
+
 @router.post("/api-keys/{api_key_id}/confirm-revoke")
 async def confirm_revoke_api_key(api_key_id: str, confirm_data: ConfirmRevokeSchema, db: Session = Depends(get_db)):
     try:
@@ -122,7 +133,8 @@ async def confirm_revoke_api_key(api_key_id: str, confirm_data: ConfirmRevokeSch
         application_repo = ApplicationRepositoryImpl(db)
         company_repo = CompanyRepositoryImpl(db)
         revocation_api_key_repo = RevocationApiKeyRepositoryImpl(db)
-        use_case = ConfirmRevokeApiKeyUseCase(api_key_repo, application_repo, company_repo, revocation_api_key_repo, rabbitmq_client)
+        use_case = ConfirmRevokeApiKeyUseCase(api_key_repo, application_repo, company_repo, revocation_api_key_repo,
+                                              rabbitmq_client)
         result = use_case.execute(api_key_id, confirm_data.confirmation_code)
         return result
     except ValueError as e:
@@ -131,11 +143,12 @@ async def confirm_revoke_api_key(api_key_id: str, confirm_data: ConfirmRevokeSch
         print(f"Error detallado: {traceback.format_exc()}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
+
 @router.get("/{application_id}/api-keys")
 async def get_application_api_keys(
-    application_id: str,
-    db: Session = Depends(get_db),
-    x_company_id: str = Header(None, alias="X-Company-ID")
+        application_id: str,
+        db: Session = Depends(get_db),
+        x_company_id: str = Header(None, alias="X-Company-ID")
 ):
     try:
         # Validación básica de seguridad

@@ -29,13 +29,16 @@ class GatewayMiddleware(BaseHTTPMiddleware):
             '/auth/companies/register',
             '/auth/companies/login',
             '/auth/companies/verify-login',
-            '/auth/api-keys/validate'
+            '/auth/api-keys/validate',
+            '/payments/webhook',
+            '/payments/health'
         ]
         
         admin_paths = [
             '/auth/applications',
             '/auth/companies/',
-            '/auth/api-keys/by-key-value'
+            '/auth/api-keys/by-key-value',
+            '/payments'
         ]
         if request.method == "OPTIONS":
             return await call_next(request)

@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 from datetime import datetime
 import pika
+from sqlalchemy import text  # <--- AGREGAR ESTO
 from src.infrastructure.config.settings import (
     AMQP_URL,
     SERVICE_NAME,
@@ -27,7 +28,7 @@ def check_rabbitmq() -> dict:
 def check_database() -> dict:
     try:
         with engine.connect() as conn:
-            conn.execute("SELECT 1")
+            conn.execute(text("SELECT 1"))
         return {
             "status": "ok",
             "host": MYSQL_HOST,
@@ -70,13 +71,13 @@ def readiness_check():
     database_status = check_database()
 
     is_ready = (
-        rabbitmq_status.get("status") == "ok" and
-        database_status.get("status") == "ok"
+            rabbitmq_status.get("status") == "ok" and
+            database_status.get("status") == "ok"
     )
 
     if is_ready:
         return {"status": "ready", "service": SERVICE_NAME}
-    
+
     return {
         "status": "not_ready",
         "service": SERVICE_NAME,
