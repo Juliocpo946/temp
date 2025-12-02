@@ -1,4 +1,5 @@
 import json
+import traceback
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from src.infrastructure.persistence.database import SessionLocal
 from src.infrastructure.websocket.connection_manager import ConnectionManager
@@ -37,6 +38,8 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str, activity_uui
             )
     except Exception as e:
         print(f"[ERROR] Error en WebSocket {activity_uuid}: {e}")
+        print(f"[ERROR] Traceback completo:")
+        traceback.print_exc()
         disconnected_state = manager.disconnect(activity_uuid)
         if disconnected_state:
             websocket_publisher.publish_websocket_disconnected(

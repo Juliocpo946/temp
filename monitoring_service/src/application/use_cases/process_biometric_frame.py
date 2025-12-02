@@ -109,7 +109,7 @@ class ProcessBiometricFrameUseCase:
             session_id=uuid.UUID(self.session_id),
             user_id=self.user_id,
             external_activity_id=self.external_activity_id,
-            intervention_type=intervention_type.value,
+            intervention_type=intervention_type.to_string(),
             cognitive_event=cognitive_event,
             confidence=confidence,
             precision=precision,
@@ -161,15 +161,13 @@ class ProcessBiometricFrameUseCase:
             self.training_sample_repo.create(sample)
 
     def _publish_event(self, intervention: Intervention, frame: BiometricFrameDTO) -> None:
-        # CORRECCIÓN: Preparar el contexto con los datos que el DTO usará en su to_dict()
         context_data = {
             "intentos_previos": self.context.instruction_count,
             "tiempo_en_estado": 0,
             "correlation_id": self.correlation_id,
-            "precision_cognitiva": intervention.precision # Se pasa aquí para que el DTO lo lea con .get("precision_cognitiva")
+            "precision_cognitiva": intervention.precision
         }
 
-        # CORRECCIÓN: Usar los nombres de argumentos en INGLÉS que espera el __init__ de MonitoringEventDTO
         event = MonitoringEventDTO(
             session_id=self.session_id,
             user_id=self.user_id,

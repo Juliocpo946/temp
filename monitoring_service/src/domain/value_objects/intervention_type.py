@@ -2,16 +2,14 @@ from enum import Enum
 
 class InterventionType(Enum):
     NO_INTERVENTION = 0
-    NO_EFFECT = 0  # Alias para compatibilidad
     VIBRATION = 1
     INSTRUCTION = 2
     PAUSE = 3
     
     @classmethod
     def from_prediction(cls, prediction):
-        # Manejo robusto para cuando el modelo devuelve strings
         pred_str = str(prediction).upper()
-        if pred_str == "NO_EFFECT" or pred_str == "NO_INTERVENTION":
+        if pred_str in ("NO_EFFECT", "NO_INTERVENTION"):
             return cls.NO_INTERVENTION
             
         mapping = {
@@ -34,3 +32,6 @@ class InterventionType(Enum):
             self.PAUSE: "pause"
         }
         return mapping.get(self, "no_intervention")
+    
+    def get_value(self) -> int:
+        return self.value
