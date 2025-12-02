@@ -105,7 +105,7 @@ class GeminiClient:
     def __init__(self, redis_client: Optional[RedisClient] = None):
         genai.configure(api_key=GEMINI_API_KEY)
         # CORRECCIÓN: Usar versión específica '002' que es estable en v1beta
-        self.model = genai.GenerativeModel('gemini-1.5-flash')
+        self.model = genai.GenerativeModel('gemini-2.0-flash')
         self.lsm_prompt = LSMPromptLoader.load()
         self.redis_client = redis_client
         self.circuit_breaker = CircuitBreaker(redis_client, "gemini", failure_threshold=5, recovery_timeout=60)
