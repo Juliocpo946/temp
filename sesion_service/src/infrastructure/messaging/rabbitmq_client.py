@@ -1,6 +1,6 @@
 import json
 import pika
-from typing import Callable, Dict, Any
+from typing import Callable, Dict, Any, Optional
 from src.infrastructure.config.settings import AMQP_URL
 
 class RabbitMQClient:
@@ -22,11 +22,9 @@ class RabbitMQClient:
             raise
 
     def declare_queue(self, queue_name: str) -> None:
-        if self.channel is None or self.channel.is_closed:
-            self.connect()
-        self.channel.queue_declare(queue=queue_name, durable=True)
+        pass
 
-    def publish(self, queue_name: str, message: Dict[str, Any]) -> bool:
+    def publish(self, queue_name: str, message: Dict[str, Any], correlation_id: Optional[str] = None) -> bool:
         max_retries = 3
         retry_count = 0
         
@@ -35,12 +33,19 @@ class RabbitMQClient:
                 if self.connection is None or self.connection.is_closed:
                     self.connect()
                 
-                self.declare_queue(queue_name)
+                properties = pika.BasicProperties(
+                    delivery_mode=2,
+                    content_type='application/json'
+                )
+                
+                if correlation_id:
+                    properties.correlation_id = correlation_id
+                
                 self.channel.basic_publish(
                     exchange='',
                     routing_key=queue_name,
                     body=json.dumps(message),
-                    properties=pika.BasicProperties(delivery_mode=2)
+                    properties=properties
                 )
                 return True
             except Exception as e:
@@ -60,7 +65,7 @@ class RabbitMQClient:
             if self.connection is None or self.connection.is_closed:
                 self.connect()
                 
-            self.declare_queue(queue_name)
+            self.channel.basic_qos(prefetch_count=10)
             self.channel.basic_consume(queue=queue_name, on_message_callback=callback, auto_ack=False)
             print(f"[RABBITMQ_CLIENT] [INFO] Escuchando en cola: {queue_name}")
             self.channel.start_consuming()
@@ -72,6 +77,5 @@ class RabbitMQClient:
         try:
             if self.connection and not self.connection.is_closed:
                 self.connection.close()
-                print(f"[RABBITMQ_CLIENT] [INFO] Desconectado de RabbitMQ")
         except Exception as e:
-            print(f"[RABBITMQ_CLIENT] [ERROR] Error al cerrar conexion RabbitMQ: {str(e)}")
+            print(f"[RABBITMQ_CLIENT] [ERROR] Error al cerrar conexión: {str(e)}")

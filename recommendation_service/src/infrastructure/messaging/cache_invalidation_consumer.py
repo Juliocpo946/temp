@@ -1,14 +1,20 @@
 import json
 import threading
-from src.infrastructure.messaging.rabbitmq_client import RabbitMQClient
+import pika
 from src.infrastructure.cache.redis_client import RedisClient
-from src.infrastructure.config.settings import CACHE_INVALIDATION_QUEUE, LOG_SERVICE_QUEUE
+from src.infrastructure.config.settings import (
+    CACHE_INVALIDATION_QUEUE,
+    LOG_SERVICE_QUEUE,
+    AMQP_URL
+)
 
 
 class CacheInvalidationConsumer:
-    def __init__(self, rabbitmq_client: RabbitMQClient, redis_client: RedisClient):
+    def __init__(self, rabbitmq_client, redis_client: RedisClient):
         self.rabbitmq_client = rabbitmq_client
         self.redis_client = redis_client
+        self._connection = None
+        self._channel = None
 
     def start(self) -> None:
         thread = threading.Thread(target=self._consume_invalidations, daemon=True)
@@ -16,10 +22,27 @@ class CacheInvalidationConsumer:
         print(f"[CACHE_INVALIDATION_CONSUMER] [INFO] Consumer iniciado")
 
     def _consume_invalidations(self) -> None:
-        try:
-            self.rabbitmq_client.consume(CACHE_INVALIDATION_QUEUE, self._callback, with_dlq=False)
-        except Exception as e:
-            print(f"[CACHE_INVALIDATION_CONSUMER] [ERROR] Error en consumer: {str(e)}")
+        while True:
+            try:
+                parameters = pika.URLParameters(AMQP_URL)
+                parameters.heartbeat = 300
+                parameters.blocked_connection_timeout = 150
+                self._connection = pika.BlockingConnection(parameters)
+                self._channel = self._connection.channel()
+                
+                self._channel.basic_qos(prefetch_count=10)
+                self._channel.basic_consume(
+                    queue=CACHE_INVALIDATION_QUEUE,
+                    on_message_callback=self._callback,
+                    auto_ack=False
+                )
+                
+                print(f"[CACHE_INVALIDATION_CONSUMER] [INFO] Escuchando en cola: {CACHE_INVALIDATION_QUEUE}")
+                self._channel.start_consuming()
+            except Exception as e:
+                print(f"[CACHE_INVALIDATION_CONSUMER] [ERROR] Error en consumer: {str(e)}")
+                import time
+                time.sleep(5)
 
     def _callback(self, ch, method, properties, body) -> None:
         try:

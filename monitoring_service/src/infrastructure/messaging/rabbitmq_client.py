@@ -29,22 +29,7 @@ class RabbitMQClient:
             self.channel = self.connection.channel()
 
     def declare_queue(self, queue_name: str, with_dlq: bool = True) -> None:
-        self._ensure_connection()
-
-        if with_dlq:
-            dlq_name = f"{queue_name}_dlq"
-            self.channel.queue_declare(queue=dlq_name, durable=True)
-            self.channel.queue_declare(
-                queue=queue_name,
-                durable=True,
-                arguments={
-                    'x-dead-letter-exchange': '',
-                    'x-dead-letter-routing-key': dlq_name,
-                    'x-message-ttl': 86400000
-                }
-            )
-        else:
-            self.channel.queue_declare(queue=queue_name, durable=True)
+        pass
 
     def publish(
         self, 
@@ -58,7 +43,6 @@ class RabbitMQClient:
         while retry_count < max_retries:
             try:
                 self._ensure_connection()
-                self.declare_queue(queue_name, with_dlq=False)
                 
                 properties = pika.BasicProperties(
                     delivery_mode=2,
@@ -90,7 +74,6 @@ class RabbitMQClient:
     def consume(self, queue_name: str, callback: Callable, with_dlq: bool = True) -> None:
         try:
             self._ensure_connection()
-            self.declare_queue(queue_name, with_dlq=with_dlq)
             self.channel.basic_qos(prefetch_count=10)
             self.channel.basic_consume(
                 queue=queue_name, 
@@ -114,6 +97,6 @@ class RabbitMQClient:
                 self.channel.close()
             if self.connection and not self.connection.is_closed:
                 self.connection.close()
-            print(f"[RABBITMQ_CLIENT] [INFO] Desconectado de RabbitMQ")
+                print(f"[RABBITMQ_CLIENT] [INFO] Desconectado de RabbitMQ")
         except Exception as e:
             print(f"[RABBITMQ_CLIENT] [ERROR] Error cerrando conexion: {str(e)}")

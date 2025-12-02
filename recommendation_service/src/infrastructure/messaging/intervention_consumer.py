@@ -46,14 +46,12 @@ class InterventionConsumer:
         while self._running:
             try:
                 parameters = pika.URLParameters(AMQP_URL)
-                parameters.heartbeat = 600
-                parameters.blocked_connection_timeout = 300
+                parameters.heartbeat = 300
+                parameters.blocked_connection_timeout = 150
                 self._connection = pika.BlockingConnection(parameters)
                 self._channel = self._connection.channel()
 
-                self._channel.queue_declare(queue=MONITORING_EVENTS_QUEUE, durable=True)
                 self._channel.basic_qos(prefetch_count=PREFETCH_COUNT)
-
                 self._channel.basic_consume(
                     queue=MONITORING_EVENTS_QUEUE,
                     on_message_callback=self._on_message,
@@ -117,43 +115,47 @@ class InterventionConsumer:
             self._safe_ack(ch, method.delivery_tag)
 
         except Exception as e:
-            print(f"[INTERVENTION_CONSUMER] [ERROR] Error procesando evento: {str(e)}, correlation_id: {correlation_id}")
+            print(f"[INTERVENTION_CONSUMER] [ERROR] Error procesando mensaje: {str(e)}")
+            self._log(
+                f"Error procesando evento: {str(e)}",
+                level="ERROR",
+                correlation_id=correlation_id
+            )
             self._safe_nack(ch, method.delivery_tag)
         finally:
             db.close()
 
     def _safe_ack(self, ch, delivery_tag) -> None:
         try:
-            if ch.is_open:
+            if ch and ch.is_open:
                 ch.basic_ack(delivery_tag=delivery_tag)
         except Exception as e:
-            print(f"[INTERVENTION_CONSUMER] [ERROR] Error en ack: {str(e)}")
+            print(f"[INTERVENTION_CONSUMER] [ERROR] Error en ACK: {str(e)}")
 
     def _safe_nack(self, ch, delivery_tag) -> None:
         try:
-            if ch.is_open:
+            if ch and ch.is_open:
                 ch.basic_nack(delivery_tag=delivery_tag, requeue=True)
         except Exception as e:
-            print(f"[INTERVENTION_CONSUMER] [ERROR] Error en nack: {str(e)}")
+            print(f"[INTERVENTION_CONSUMER] [ERROR] Error en NACK: {str(e)}")
 
-    def _log(self, message: str, level: str = "info", correlation_id: Optional[str] = None) -> None:
-        log_message = {
-            "service": "recommendation-service",
-            "level": level,
-            "message": message,
-            "correlation_id": correlation_id,
-            "timestamp": datetime.utcnow().isoformat()
-        }
-        self.rabbitmq_client.publish(LOG_SERVICE_QUEUE, log_message, correlation_id=correlation_id)
-
-    def close(self) -> None:
-        self._running = False
-        self.executor.shutdown(wait=False)
+    def _log(self, message: str, level: str = "INFO", correlation_id: Optional[str] = None) -> None:
         try:
-            if self._channel and self._channel.is_open:
-                self._channel.stop_consuming()
-            if self._connection and self._connection.is_open:
-                self._connection.close()
-        except Exception as e:
-            print(f"[INTERVENTION_CONSUMER] [ERROR] Error cerrando consumer: {str(e)}")
-        print(f"[INTERVENTION_CONSUMER] [INFO] Consumer cerrado")
+            log_message = {
+                "service": "recommendation-service",
+                "level": level,
+                "message": message,
+                "timestamp": datetime.utcnow().isoformat(),
+                "correlation_id": correlation_id
+            }
+            self.rabbitmq_client.publish(LOG_SERVICE_QUEUE, log_message)
+        except Exception:
+            pass
+
+    def stop(self) -> None:
+        self._running = False
+        if self._channel and self._channel.is_open:
+            self._channel.stop_consuming()
+        if self._connection and not self._connection.is_closed:
+            self._connection.close()
+        self.executor.shutdown(wait=True)

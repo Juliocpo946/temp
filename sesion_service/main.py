@@ -74,50 +74,29 @@ def validate_database_connection() -> bool:
 
 def validate_rabbitmq_and_queues() -> bool:
     required_queues = [
-        {
-            "name": ACTIVITY_DETAILS_REQUEST_QUEUE,
-            "with_dlq": False
-        },
-        {
-            "name": ACTIVITY_DETAILS_RESPONSE_QUEUE,
-            "with_dlq": False
-        },
-        {
-            "name": SESSION_CONFIG_REQUEST_QUEUE,
-            "with_dlq": False
-        },
-        {
-            "name": SESSION_CONFIG_RESPONSE_QUEUE,
-            "with_dlq": False
-        },
-        {
-            "name": MONITORING_WEBSOCKET_EVENTS_QUEUE,
-            "with_dlq": False
-        },
-        {
-            "name": LOG_SERVICE_QUEUE,
-            "with_dlq": False
-        },
-        {
-            "name": CACHE_INVALIDATION_QUEUE,
-            "with_dlq": False
-        }
+        {"name": ACTIVITY_DETAILS_REQUEST_QUEUE, "required": True},
+        {"name": ACTIVITY_DETAILS_RESPONSE_QUEUE, "required": False},
+        {"name": SESSION_CONFIG_REQUEST_QUEUE, "required": True},
+        {"name": SESSION_CONFIG_RESPONSE_QUEUE, "required": False},
+        {"name": MONITORING_WEBSOCKET_EVENTS_QUEUE, "required": True},
+        {"name": LOG_SERVICE_QUEUE, "required": True},
+        {"name": CACHE_INVALIDATION_QUEUE, "required": True}
     ]
 
     is_valid, results = validate_service_queues(required_queues, create_missing=True)
 
-    if is_valid:
-        print(f"[MAIN] [INFO] Validacion de colas completada:")
-        for queue_info in results.get("queues", []):
-            status = queue_info.get("status", "unknown")
-            name = queue_info.get("name")
-            consumers = queue_info.get("consumer_count", 0)
-            messages = queue_info.get("message_count", 0)
-            print(f"  - {name}: {status} (consumers={consumers}, messages={messages})")
-    else:
-        print(f"[MAIN] [ERROR] Validacion de colas fallida")
-        for error in results.get("errors", []):
-            print(f"  - {error}")
+    print(f"[MAIN] [INFO] Validacion de colas completada:")
+    for queue in results.get("queues", []):
+        status = queue.get("status", "unknown")
+        consumers = queue.get("consumers", 0)
+        messages = queue.get("messages", 0)
+        print(f"  - {queue['name']}: {status} (consumers={consumers}, messages={messages})")
+
+    for warning in results.get("warnings", []):
+        print(f"[MAIN] [WARNING] {warning}")
+
+    for error in results.get("errors", []):
+        print(f"  - {error}")
 
     return is_valid
 
@@ -161,8 +140,6 @@ async def lifespan(app: FastAPI):
 
     if rabbitmq_client:
         rabbitmq_client.close()
-    if websocket_event_consumer:
-        websocket_event_consumer.rabbitmq_client.close()
     print(f"[MAIN] [INFO] {SERVICE_NAME} detenido")
 
 
