@@ -21,17 +21,39 @@ class MonitoringEventDTO:
         self.context = context
         self.timestamp = timestamp
 
+    # --- PROPIEDADES ALIAS ---
+    @property
+    def evento_cognitivo(self) -> str:
+        return self._map_intervention_to_evento()
+
+    @property
+    def accion_sugerida(self) -> str:
+        return self.intervention_type
+
+    @property
+    def precision_cognitiva(self) -> float:
+        return self.context.get("precision_cognitiva", 0.0)
+
+    @property
+    def confianza(self) -> float:
+        return self.confidence
+
+    @property
+    def contexto(self) -> Dict[str, Any]:
+        return self.context
+    # -------------------------
+
     def to_dict(self) -> Dict[str, Any]:
         return {
             "session_id": self.session_id,
             "user_id": self.user_id,
             "external_activity_id": self.external_activity_id,
             "activity_uuid": self.activity_uuid,
-            "evento_cognitivo": self._map_intervention_to_evento(),
-            "accion_sugerida": self.intervention_type,
-            "precision_cognitiva": self.context.get("precision_cognitiva", 0.5),
-            "confianza": self.confidence,
-            "contexto": self.context,
+            "evento_cognitivo": self.evento_cognitivo, # Usa la propiedad
+            "accion_sugerida": self.accion_sugerida,   # Usa la propiedad
+            "precision_cognitiva": self.precision_cognitiva, # Usa la propiedad
+            "confianza": self.confianza,               # Usa la propiedad
+            "contexto": self.contexto,                 # Usa la propiedad
             "timestamp": self.timestamp
         }
 
@@ -41,4 +63,8 @@ class MonitoringEventDTO:
             "instruction": "frustracion",
             "pause": "cansancio_cognitivo"
         }
-        return mapping.get(self.intervention_type, "desconocido")
+        # Manejo robusto para Enum o string
+        val = getattr(self.intervention_type, "value", self.intervention_type)
+        if hasattr(val, "lower"):
+             val = val.lower()
+        return mapping.get(val, "desconocido")

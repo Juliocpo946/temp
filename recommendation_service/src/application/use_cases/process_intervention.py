@@ -53,6 +53,9 @@ class ProcessInterventionUseCase:
             return None
 
         activity_details = self._get_activity_details(event)
+        
+        # Extraer activity_uuid del contexto del evento
+        activity_uuid = event.contexto.get("activity_uuid") if event.contexto else None
 
         topic = activity_details.topic if activity_details else "general"
         content_type = self._determine_content_type(action, event.evento_cognitivo)
@@ -76,12 +79,16 @@ class ProcessInterventionUseCase:
             "action": action,
             "content": content,
             "vibration": vibration_pattern,
+            "contexto": {
+                "activity_uuid": activity_uuid
+            },
             "metadata": {
                 "cognitive_event": event.evento_cognitivo,
                 "precision": event.precision_cognitiva,
                 "confidence": event.confianza,
                 "topic": topic,
-                "content_type": content_type
+                "content_type": content_type,
+                "activity_uuid": activity_uuid
             },
             "timestamp": datetime.utcnow().isoformat()
         }

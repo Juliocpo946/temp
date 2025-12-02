@@ -74,7 +74,7 @@ async def proxy_request(
             method=request.method,
             url=full_url,
             headers=headers,
-            content=body if body else None
+            content=body
         )
 
         response_headers = dict(response.headers)
@@ -85,26 +85,17 @@ async def proxy_request(
         return Response(
             content=response.content,
             status_code=response.status_code,
-            headers=response_headers,
-            media_type=response.headers.get("content-type")
+            headers=response_headers
         )
-    except httpx.ConnectError as e:
-        print(f"[GATEWAY] Error de conexion a {full_url}: {e}")
-        return JSONResponse(
-            status_code=503,
-            content={"detail": "Servicio no disponible"}
-        )
-    except httpx.TimeoutException as e:
-        print(f"[GATEWAY] Timeout en {full_url}: {e}")
+    except httpx.TimeoutException:
         return JSONResponse(
             status_code=504,
-            content={"detail": "Timeout del servicio"}
+            content={"detail": "Timeout en servicio destino"}
         )
     except Exception as e:
-        print(f"[GATEWAY] Error en proxy a {full_url}: {e}")
         return JSONResponse(
             status_code=502,
-            content={"detail": "Error en el gateway"}
+            content={"detail": f"Error en proxy: {str(e)}"}
         )
 
 
@@ -305,7 +296,7 @@ async def websocket_proxy(websocket: WebSocket, session_id: str, activity_uuid: 
                 forward_to_monitoring(websocket, monitoring_ws, proxy_state)
             )
             forward_to_client_task = asyncio.create_task(
-                forward_to_client(websocket, monitoring_ws)
+                forward_to_client(websocket, monitoring_ws, activity_uuid)
             )
 
             done, pending = await asyncio.wait(
@@ -390,10 +381,13 @@ async def forward_to_monitoring(client_ws: WebSocket, monitoring_ws, proxy_state
         raise
 
 
-async def forward_to_client(client_ws: WebSocket, monitoring_ws):
+async def forward_to_client(client_ws: WebSocket, monitoring_ws, activity_uuid: str):
     try:
         async for message in monitoring_ws:
+            # DEBUG: Log de mensajes recibidos del monitoring
+            print(f"[GATEWAY WS] Mensaje de Monitoring para {activity_uuid}: {message[:200] if len(str(message)) > 200 else message}")
             await client_ws.send_text(message)
+            print(f"[GATEWAY WS] Mensaje reenviado a cliente: {activity_uuid}")
     except websockets.exceptions.ConnectionClosed as e:
         print(f"[GATEWAY WS] Conexion de Monitoring cerrada: {e}")
         raise

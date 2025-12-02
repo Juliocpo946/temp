@@ -1,16 +1,22 @@
 import json
 import threading
-from typing import Dict, Any, List
-from src.infrastructure.messaging.rabbitmq_client import RabbitMQClient
+import pika
+from typing import Dict
 from src.infrastructure.cache.redis_client import RedisClient
-from src.infrastructure.config.settings import INTERVENTION_EVALUATIONS_QUEUE, LOG_SERVICE_QUEUE
+from src.infrastructure.config.settings import (
+    INTERVENTION_EVALUATIONS_QUEUE,
+    LOG_SERVICE_QUEUE,
+    AMQP_URL
+)
 
 
 class InterventionEvaluationConsumer:
-    def __init__(self, rabbitmq_client: RabbitMQClient, redis_client: RedisClient):
+    def __init__(self, rabbitmq_client, redis_client: RedisClient):
         self.rabbitmq_client = rabbitmq_client
         self.redis_client = redis_client
         self._negative_evaluations: Dict[str, int] = {}
+        self._connection = None
+        self._channel = None
 
     def start(self) -> None:
         thread = threading.Thread(target=self._consume_evaluations, daemon=True)
@@ -18,10 +24,27 @@ class InterventionEvaluationConsumer:
         print(f"[INTERVENTION_EVAL_CONSUMER] [INFO] Consumer de evaluaciones iniciado")
 
     def _consume_evaluations(self) -> None:
-        try:
-            self.rabbitmq_client.consume(INTERVENTION_EVALUATIONS_QUEUE, self._callback, with_dlq=True)
-        except Exception as e:
-            print(f"[INTERVENTION_EVAL_CONSUMER] [ERROR] Error en consumer: {str(e)}")
+        while True:
+            try:
+                parameters = pika.URLParameters(AMQP_URL)
+                parameters.heartbeat = 300
+                parameters.blocked_connection_timeout = 150
+                self._connection = pika.BlockingConnection(parameters)
+                self._channel = self._connection.channel()
+                
+                self._channel.basic_qos(prefetch_count=10)
+                self._channel.basic_consume(
+                    queue=INTERVENTION_EVALUATIONS_QUEUE,
+                    on_message_callback=self._callback,
+                    auto_ack=False
+                )
+                
+                print(f"[INTERVENTION_EVAL_CONSUMER] [INFO] Escuchando en cola: {INTERVENTION_EVALUATIONS_QUEUE}")
+                self._channel.start_consuming()
+            except Exception as e:
+                print(f"[INTERVENTION_EVAL_CONSUMER] [ERROR] Error en consumer: {str(e)}")
+                import time
+                time.sleep(5)
 
     def _callback(self, ch, method, properties, body) -> None:
         try:
@@ -61,35 +84,4 @@ class InterventionEvaluationConsumer:
         self._negative_evaluations[key] = self._negative_evaluations.get(key, 0) + 1
         
         if self._negative_evaluations[key] >= 3:
-            print(f"[INTERVENTION_EVAL_CONSUMER] [WARNING] Contenido con evaluaciones negativas recurrentes: {key}")
-
-    def get_content_effectiveness(self, topic: str, cognitive_event: str) -> Dict[str, Any]:
-        evaluations = self.redis_client.get_intervention_evaluations_for_topic(topic)
-        
-        total = len(evaluations)
-        if total == 0:
-            return {"effectiveness": 0.5, "sample_size": 0}
-        
-        positive = sum(1 for e in evaluations if e.get("result") == "positive")
-        negative = sum(1 for e in evaluations if e.get("result") in ["negative", "sin_efecto"])
-        
-        effectiveness = positive / total if total > 0 else 0.5
-        
-        return {
-            "effectiveness": effectiveness,
-            "positive": positive,
-            "negative": negative,
-            "sample_size": total
-        }
-
-    def should_avoid_content_type(self, topic: str, cognitive_event: str, content_type: str) -> bool:
-        key = f"{topic}:{cognitive_event}:{content_type}"
-        return self._negative_evaluations.get(key, 0) >= 3
-
-    def _log(self, message: str, level: str = "info") -> None:
-        log_message = {
-            "service": "recommendation-service",
-            "level": level,
-            "message": message
-        }
-        self.rabbitmq_client.publish(LOG_SERVICE_QUEUE, log_message)
+            print(f"[INTERVENTION_EVAL_CONSUMER] [WARNING] Contenido con multiples evaluaciones negativas: {key}")

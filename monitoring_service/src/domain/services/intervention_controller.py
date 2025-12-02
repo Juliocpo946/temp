@@ -119,7 +119,8 @@ class SessionContext:
             "last_pause_at": self.last_pause_at.isoformat() if self.last_pause_at else None
         }
 
-    def register_intervention(self, intervention_type: InterventionType) -> None:
+    # RENOMBRADO de register_intervention a record_intervention
+    def record_intervention(self, intervention_type: InterventionType) -> None:
         now = datetime.utcnow()
         if intervention_type == InterventionType.VIBRATION:
             self.last_vibration_at = now

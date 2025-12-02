@@ -2,19 +2,20 @@ import json
 import uuid
 import threading
 import time
+import pika
 from typing import Optional, Dict, Any
-from src.infrastructure.messaging.rabbitmq_client import RabbitMQClient
 from src.infrastructure.cache.redis_client import RedisClient
 from src.infrastructure.config.settings import (
     SESSION_CONFIG_REQUEST_QUEUE,
     RABBITMQ_TIMEOUT,
     MAX_RETRIES,
-    CACHE_TTL
+    CACHE_TTL,
+    AMQP_URL
 )
 
 
 class SessionConfigClient:
-    def __init__(self, rabbitmq_client: RabbitMQClient, redis_client: Optional[RedisClient] = None):
+    def __init__(self, rabbitmq_client, redis_client: Optional[RedisClient] = None):
         self.rabbitmq_client = rabbitmq_client
         self.redis_client = redis_client
         self._pending_requests: Dict[str, Optional[Dict[str, Any]]] = {}
@@ -22,6 +23,8 @@ class SessionConfigClient:
         self._response_consumer_started = False
         self._instance_id = str(uuid.uuid4())[:8]
         self._response_queue = f"session_config_response_{self._instance_id}"
+        self._connection = None
+        self._channel = None
         self._default_config = {
             "cognitive_analysis_enabled": True,
             "text_notifications": True,
@@ -38,121 +41,101 @@ class SessionConfigClient:
 
         thread = threading.Thread(target=self._consume_responses, daemon=True)
         thread.start()
-        self._response_consumer_started = True
         print(f"[SESSION_CONFIG_CLIENT] [INFO] Consumer de respuestas iniciado en cola: {self._response_queue}")
 
     def _consume_responses(self) -> None:
-        try:
-            self.rabbitmq_client.consume_exclusive(self._response_queue, self._handle_response)
-        except Exception as e:
-            print(f"[SESSION_CONFIG_CLIENT] [ERROR] Error en consumer de respuestas: {e}")
-            time.sleep(5)
-            self._response_consumer_started = False
-            self._start_response_consumer()
+        while True:
+            try:
+                parameters = pika.URLParameters(AMQP_URL)
+                parameters.heartbeat = 300
+                parameters.blocked_connection_timeout = 150
+                self._connection = pika.BlockingConnection(parameters)
+                self._channel = self._connection.channel()
+                
+                self._channel.queue_declare(
+                    queue=self._response_queue,
+                    durable=False,
+                    exclusive=False,
+                    auto_delete=True
+                )
+                
+                self._channel.basic_consume(
+                    queue=self._response_queue,
+                    on_message_callback=self._on_response,
+                    auto_ack=True
+                )
+                
+                self._channel.start_consuming()
+            except Exception as e:
+                print(f"[SESSION_CONFIG_CLIENT] [ERROR] Error en consumer de respuestas: {str(e)}")
+                time.sleep(5)
 
-    def _handle_response(self, ch, method, properties, body) -> None:
+    def _on_response(self, ch, method, properties, body) -> None:
         try:
-            data = json.loads(body)
-            correlation_id = data.get("correlation_id")
+            message = json.loads(body)
+            correlation_id = message.get("correlation_id")
 
-            if correlation_id and correlation_id in self._pending_requests:
+            if correlation_id in self._pending_requests:
+                config = {
+                    "cognitive_analysis_enabled": message.get("cognitive_analysis_enabled", True),
+                    "text_notifications": message.get("text_notifications", True),
+                    "video_suggestions": message.get("video_suggestions", True),
+                    "vibration_alerts": message.get("vibration_alerts", True),
+                    "pause_suggestions": message.get("pause_suggestions", True),
+                    "is_default": False
+                }
+                
                 with self._lock:
-                    self._pending_requests[correlation_id] = data
+                    self._pending_requests[correlation_id] = config
 
-                session_id = data.get("session_id")
-                if self.redis_client and session_id:
-                    self._cache_config(session_id, data)
+                if self.redis_client:
+                    session_id = message.get("session_id")
+                    if session_id:
+                        # CORRECCIÓN: Usar set_session_config en lugar de store_session_config
+                        self.redis_client.set_session_config(session_id, config, ttl=CACHE_TTL)
 
-            ch.basic_ack(delivery_tag=method.delivery_tag)
         except Exception as e:
-            print(f"[SESSION_CONFIG_CLIENT] [ERROR] Error procesando respuesta: {e}")
-            ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
+            print(f"[SESSION_CONFIG_CLIENT] [ERROR] Error procesando respuesta: {str(e)}")
 
-    def _cache_config(self, session_id: str, config: Dict[str, Any]) -> None:
-        if not self.redis_client:
-            return
-        try:
-            cache_data = {
-                "cognitive_analysis_enabled": config.get("cognitive_analysis_enabled", True),
-                "text_notifications": config.get("text_notifications", True),
-                "video_suggestions": config.get("video_suggestions", True),
-                "vibration_alerts": config.get("vibration_alerts", True),
-                "pause_suggestions": config.get("pause_suggestions", True)
-            }
-            self.redis_client.set_session_config(session_id, cache_data, CACHE_TTL)
-        except Exception as e:
-            print(f"[SESSION_CONFIG_CLIENT] [ERROR] Error cacheando config: {e}")
+    def get_session_config(self, session_id: str) -> Dict[str, Any]:
+        if self.redis_client:
+            cached = self.redis_client.get_session_config(session_id)
+            if cached:
+                return cached
 
-    def _get_cached(self, session_id: str) -> Optional[Dict[str, Any]]:
-        if not self.redis_client:
-            return None
-        try:
-            return self.redis_client.get_session_config(session_id)
-        except Exception as e:
-            print(f"[SESSION_CONFIG_CLIENT] [ERROR] Error obteniendo cache: {e}")
-            return None
-
-    def get_session_config(self, session_id: str, timeout: float = None) -> Dict[str, Any]:
-        if timeout is None:
-            timeout = float(RABBITMQ_TIMEOUT)
-
-        cached = self._get_cached(session_id)
-        if cached:
-            print(f"[SESSION_CONFIG_CLIENT] [INFO] Config obtenida de cache para sesion: {session_id}")
-            return cached
-
-        for attempt in range(MAX_RETRIES):
-            result = self._request_with_timeout(session_id, timeout)
-            if result and not result.get("is_default"):
-                return result
-            
-            if attempt < MAX_RETRIES - 1:
-                wait_time = (attempt + 1) * 0.5
-                print(f"[SESSION_CONFIG_CLIENT] [INFO] Reintentando solicitud (intento {attempt + 2}/{MAX_RETRIES})")
-                time.sleep(wait_time)
-
-        print(f"[SESSION_CONFIG_CLIENT] [WARNING] Usando config por defecto para sesion: {session_id}")
-        return self._default_config.copy()
-
-    def _request_with_timeout(self, session_id: str, timeout: float) -> Optional[Dict[str, Any]]:
         correlation_id = str(uuid.uuid4())
 
         with self._lock:
             self._pending_requests[correlation_id] = None
 
         request = {
-            "type": "session_config_request",
             "session_id": session_id,
             "correlation_id": correlation_id,
             "reply_to": self._response_queue
         }
 
-        success = self.rabbitmq_client.publish(SESSION_CONFIG_REQUEST_QUEUE, request)
+        success = self.rabbitmq_client.publish(
+            SESSION_CONFIG_REQUEST_QUEUE,
+            request,
+            correlation_id=correlation_id
+        )
+
         if not success:
             with self._lock:
-                del self._pending_requests[correlation_id]
-            return None
+                self._pending_requests.pop(correlation_id, None)
+            return self._default_config
 
         start_time = time.time()
-        while time.time() - start_time < timeout:
+        while time.time() - start_time < RABBITMQ_TIMEOUT:
             with self._lock:
-                if self._pending_requests.get(correlation_id) is not None:
-                    response = self._pending_requests.pop(correlation_id)
+                response = self._pending_requests.get(correlation_id)
+                if response is not None:
+                    self._pending_requests.pop(correlation_id, None)
                     return response
-            time.sleep(0.05)
+            time.sleep(0.1)
 
         with self._lock:
-            if correlation_id in self._pending_requests:
-                del self._pending_requests[correlation_id]
+            self._pending_requests.pop(correlation_id, None)
 
-        print(f"[SESSION_CONFIG_CLIENT] [WARNING] Timeout esperando config para sesion: {session_id}")
-        return None
-
-    def invalidate_cache(self, session_id: str) -> bool:
-        if not self.redis_client:
-            return False
-        try:
-            return self.redis_client.delete_session_config(session_id)
-        except Exception as e:
-            print(f"[SESSION_CONFIG_CLIENT] [ERROR] Error invalidando cache: {e}")
-            return False
+        print(f"[SESSION_CONFIG_CLIENT] [WARNING] Timeout, usando config por defecto para sesion: {session_id}")
+        return self._default_config

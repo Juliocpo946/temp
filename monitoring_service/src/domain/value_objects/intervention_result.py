@@ -2,6 +2,6 @@ from enum import Enum
 
 class InterventionResult(Enum):
     PENDING = "pending"
-    IMPROVED = "improved"
-    NO_CHANGE = "no_change"
-    WORSENED = "worsened"
+    POSITIVE = "positive"
+    NEGATIVE = "negative"
+    NO_EFFECT = "no_effect"

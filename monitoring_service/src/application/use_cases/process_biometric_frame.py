@@ -99,16 +99,21 @@ class ProcessBiometricFrameUseCase:
     ) -> Intervention:
         cognitive_event = self._map_intervention_to_cognitive_event(intervention_type)
 
+        precision = 0.0
+        if frame.emocion_principal:
+            precision = frame.emocion_principal.get("confianza", 0.0)
+
         intervention = Intervention(
             id=None,
             activity_uuid=uuid.UUID(self.activity_uuid),
             session_id=uuid.UUID(self.session_id),
             user_id=self.user_id,
-            intervention_type=intervention_type.value,
+            external_activity_id=self.external_activity_id,
+            intervention_type=intervention_type.to_string(),
             cognitive_event=cognitive_event,
             confidence=confidence,
-            precision=frame.emocion_principal.confianza if frame.emocion_principal else 0.0,
-            created_at=datetime.utcnow(),
+            precision=precision,
+            triggered_at=datetime.utcnow(),
             result=None,
             evaluated_at=None
         )
@@ -132,9 +137,11 @@ class ProcessBiometricFrameUseCase:
         sample = TrainingSample(
             id=None,
             intervention_id=intervention.id,
-            sequence_data=sequence.tolist(),
+            external_activity_id=self.external_activity_id,
+            window_data=sequence.tolist(),
             context_data=context_vector.tolist(),
-            label=intervention.intervention_type,
+            label=str(intervention.intervention_type),
+            source="realtime",
             created_at=datetime.utcnow()
         )
         self.training_sample_repo.create(sample)
@@ -144,28 +151,31 @@ class ProcessBiometricFrameUseCase:
             sample = TrainingSample(
                 id=None,
                 intervention_id=None,
-                sequence_data=sequence.tolist(),
+                external_activity_id=self.external_activity_id,
+                window_data=sequence.tolist(),
                 context_data=context_vector.tolist(),
                 label="no_intervention",
+                source="realtime",
                 created_at=datetime.utcnow()
             )
             self.training_sample_repo.create(sample)
 
     def _publish_event(self, intervention: Intervention, frame: BiometricFrameDTO) -> None:
+        context_data = {
+            "intentos_previos": self.context.instruction_count,
+            "tiempo_en_estado": 0,
+            "correlation_id": self.correlation_id,
+            "precision_cognitiva": intervention.precision
+        }
+
         event = MonitoringEventDTO(
             session_id=self.session_id,
             user_id=self.user_id,
             external_activity_id=self.external_activity_id,
-            evento_cognitivo=intervention.cognitive_event,
-            accion_sugerida=intervention.intervention_type,
-            precision_cognitiva=intervention.precision,
-            confianza=intervention.confidence,
-            contexto={
-                "activity_uuid": self.activity_uuid,
-                "intentos_previos": self.context.instruction_count,
-                "tiempo_en_estado": 0,
-                "correlation_id": self.correlation_id
-            },
+            activity_uuid=self.activity_uuid,
+            intervention_type=intervention.intervention_type,
+            confidence=intervention.confidence,
+            context=context_data,
             timestamp=int(datetime.utcnow().timestamp() * 1000)
         )
 

@@ -1,6 +1,7 @@
 import sys
 import asyncio
 from contextlib import asynccontextmanager
+from sqlalchemy import text
 from fastapi import FastAPI
 from src.infrastructure.config.settings import (
     SERVICE_PORT,
@@ -44,7 +45,7 @@ def validate_configuration() -> bool:
 def validate_database_connection() -> bool:
     try:
         with engine.connect() as conn:
-            conn.execute("SELECT 1")
+            conn.execute(text("SELECT 1"))
         print(f"[MAIN] [INFO] Conexion a base de datos verificada")
         return True
     except Exception as e:

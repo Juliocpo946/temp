@@ -17,15 +17,20 @@ class MonitoringPublisher:
         return cls._instance
 
     def publish(self, event: MonitoringEventDTO, correlation_id: Optional[str] = None) -> bool:
+        # Agregar activity_uuid al contexto para que el recommendation_service lo reciba
+        contexto = event.contexto.copy() if event.contexto else {}
+        contexto["activity_uuid"] = event.activity_uuid
+        
         message = {
             "session_id": event.session_id,
             "user_id": event.user_id,
             "external_activity_id": event.external_activity_id,
+            "activity_uuid": event.activity_uuid,
             "evento_cognitivo": event.evento_cognitivo,
             "accion_sugerida": event.accion_sugerida,
             "precision_cognitiva": event.precision_cognitiva,
             "confianza": event.confianza,
-            "contexto": event.contexto,
+            "contexto": contexto,
             "timestamp": event.timestamp,
             "correlation_id": correlation_id,
             "published_at": datetime.utcnow().isoformat()
@@ -39,7 +44,7 @@ class MonitoringPublisher:
 
         if success:
             self._log(
-                f"Evento publicado: session={event.session_id}, evento={event.evento_cognitivo}, correlation_id={correlation_id}",
+                f"Evento publicado: session={event.session_id}, activity={event.activity_uuid}, evento={event.evento_cognitivo}, correlation_id={correlation_id}",
                 correlation_id=correlation_id
             )
         else:

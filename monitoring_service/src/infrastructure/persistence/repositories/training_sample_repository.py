@@ -44,7 +44,7 @@ class TrainingSampleRepository:
         ).first()
         return self._to_domain(db_sample) if db_sample else None
 
-    def update_label(self, sample_id: str, new_label: int) -> None:
+    def update_label(self, sample_id: str, new_label: str) -> None:
         self.db.query(TrainingSampleModel).filter(
             TrainingSampleModel.id == sample_id
         ).update({"label": new_label}, synchronize_session=False)
@@ -58,7 +58,7 @@ class TrainingSampleRepository:
             external_activity_id=int(db_sample.external_activity_id),
             window_data=db_sample.window_data,
             context_data=db_sample.context_data,
-            label=db_sample.label,
+            label=str(db_sample.label), # Asegurar string
             source=db_sample.source,
             created_at=db_sample.created_at,
             used_in_training=db_sample.used_in_training

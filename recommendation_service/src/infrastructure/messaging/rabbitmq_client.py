@@ -29,23 +29,7 @@ class RabbitMQClient:
             self.channel = self.connection.channel()
 
     def declare_queue(self, queue_name: str, with_dlq: bool = True) -> None:
-        self._ensure_connection()
-
-        if with_dlq:
-            dlq_name = f"{queue_name}_dlq"
-            self.channel.queue_declare(queue=dlq_name, durable=True)
-
-            self.channel.queue_declare(
-                queue=queue_name,
-                durable=True,
-                arguments={
-                    'x-dead-letter-exchange': '',
-                    'x-dead-letter-routing-key': dlq_name,
-                    'x-message-ttl': 86400000
-                }
-            )
-        else:
-            self.channel.queue_declare(queue=queue_name, durable=True)
+        pass
 
     def declare_exclusive_queue(self, queue_name: str) -> str:
         self._ensure_connection()
@@ -64,7 +48,6 @@ class RabbitMQClient:
         while retry_count < max_retries:
             try:
                 self._ensure_connection()
-                self.declare_queue(queue_name, with_dlq=False)
                 
                 properties = pika.BasicProperties(
                     delivery_mode=2,
@@ -93,44 +76,15 @@ class RabbitMQClient:
                     return False
         return False
 
-    def publish_with_reply(self, queue_name: str, message: Dict[str, Any], reply_to: str, correlation_id: str) -> bool:
-        max_retries = 3
-        retry_count = 0
-
-        while retry_count < max_retries:
-            try:
-                self._ensure_connection()
-                self.declare_queue(queue_name, with_dlq=False)
-                self.channel.basic_publish(
-                    exchange='',
-                    routing_key=queue_name,
-                    body=json.dumps(message),
-                    properties=pika.BasicProperties(
-                        delivery_mode=2,
-                        content_type='application/json',
-                        reply_to=reply_to,
-                        correlation_id=correlation_id
-                    )
-                )
-                return True
-            except Exception as e:
-                retry_count += 1
-                print(f"[RABBITMQ_CLIENT] [ERROR] Error publicando mensaje con reply (intento {retry_count}/{max_retries}): {str(e)}")
-                if retry_count < max_retries:
-                    try:
-                        self._connect()
-                    except Exception:
-                        pass
-                else:
-                    return False
-        return False
-
     def consume(self, queue_name: str, callback: Callable, with_dlq: bool = True) -> None:
         try:
             self._ensure_connection()
-            self.declare_queue(queue_name, with_dlq=with_dlq)
             self.channel.basic_qos(prefetch_count=10)
-            self.channel.basic_consume(queue=queue_name, on_message_callback=callback, auto_ack=False)
+            self.channel.basic_consume(
+                queue=queue_name, 
+                on_message_callback=callback, 
+                auto_ack=False
+            )
             print(f"[RABBITMQ_CLIENT] [INFO] Escuchando en cola: {queue_name}")
             self.channel.start_consuming()
         except Exception as e:
@@ -140,8 +94,12 @@ class RabbitMQClient:
     def consume_exclusive(self, queue_name: str, callback: Callable) -> None:
         try:
             self._ensure_connection()
-            self.declare_exclusive_queue(queue_name)
-            self.channel.basic_consume(queue=queue_name, on_message_callback=callback, auto_ack=False)
+            self.channel.basic_qos(prefetch_count=1)
+            self.channel.basic_consume(
+                queue=queue_name,
+                on_message_callback=callback,
+                auto_ack=False
+            )
             print(f"[RABBITMQ_CLIENT] [INFO] Escuchando en cola exclusiva: {queue_name}")
             self.channel.start_consuming()
         except Exception as e:
@@ -159,6 +117,5 @@ class RabbitMQClient:
                 self.channel.close()
             if self.connection and not self.connection.is_closed:
                 self.connection.close()
-            print(f"[RABBITMQ_CLIENT] [INFO] Desconectado de RabbitMQ")
         except Exception as e:
             print(f"[RABBITMQ_CLIENT] [ERROR] Error cerrando conexion: {str(e)}")

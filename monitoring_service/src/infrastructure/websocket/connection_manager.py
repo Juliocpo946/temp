@@ -1,7 +1,8 @@
+import json
 import asyncio
 from typing import Dict, Optional, List
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from fastapi import WebSocket
 from src.infrastructure.ml.sequence_buffer import SequenceBuffer
 from src.domain.services.intervention_controller import SessionContext
@@ -27,10 +28,10 @@ class BackpressureMetrics:
 
 
 class ConnectionState:
-    MAX_BUFFER_SIZE = 50
-    THROTTLE_THRESHOLD = 40
-    THROTTLE_DURATION_SECONDS = 5
-    MAX_FRAMES_PER_SECOND = 30
+    MAX_BUFFER_SIZE = 300
+    THROTTLE_THRESHOLD = 250
+    THROTTLE_DURATION_SECONDS = 2
+    MAX_FRAMES_PER_SECOND = 60
 
     def __init__(self, websocket: WebSocket, session_id: str, activity_uuid: str):
         self.websocket = websocket
@@ -122,9 +123,6 @@ class ConnectionState:
         self._backpressure.is_throttled = True
         self._backpressure.throttle_events += 1
         self._backpressure.last_throttle_at = now
-        self._backpressure.throttle_until = datetime.utcnow()
-        
-        from datetime import timedelta
         self._backpressure.throttle_until = now + timedelta(seconds=self.THROTTLE_DURATION_SECONDS)
         
         print(f"[BACKPRESSURE] [WARNING] Throttle activado para actividad: {self.activity_uuid}, buffer: {len(self._frame_buffer)}")
@@ -158,6 +156,16 @@ class ConnectionState:
             "buffer_size": len(self._frame_buffer),
             "max_buffer_size": self.MAX_BUFFER_SIZE
         }
+
+    async def send_personal_message(self, message: Dict, activity_uuid: str):
+        try:
+            text_message = json.dumps(message)
+            print(f"[CONNECTION_STATE] [DEBUG] Enviando mensaje con keys: {list(message.keys())}")
+            await self.websocket.send_text(text_message)
+            return True
+        except Exception as e:
+            print(f"[CONNECTION_STATE] [ERROR] Error enviando mensaje WS: {e}")
+            return False
 
 
 class ConnectionManager:
@@ -199,6 +207,15 @@ class ConnectionManager:
 
     def get_state(self, activity_uuid: str) -> Optional[ConnectionState]:
         return self.active_connections.get(activity_uuid)
+        
+    def has_connection(self, activity_uuid: str) -> bool:
+        return activity_uuid in self.active_connections
+
+    async def send_personal_message(self, message: Dict, activity_uuid: str):
+        if activity_uuid in self.active_connections:
+            state = self.active_connections[activity_uuid]
+            return await state.send_personal_message(message, activity_uuid)
+        return False
 
     def get_state_by_session_id(self, session_id: str) -> Optional[ConnectionState]:
         for state in self.active_connections.values():
@@ -232,3 +249,7 @@ class ConnectionManager:
     @property
     def connection_count(self) -> int:
         return len(self.active_connections)
+
+
+# Instancia global exportada
+manager = ConnectionManager()
