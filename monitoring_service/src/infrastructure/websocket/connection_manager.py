@@ -1,7 +1,8 @@
+import json
 import asyncio
 from typing import Dict, Optional, List
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from fastapi import WebSocket
 from src.infrastructure.ml.sequence_buffer import SequenceBuffer
 from src.domain.services.intervention_controller import SessionContext
@@ -27,7 +28,6 @@ class BackpressureMetrics:
 
 
 class ConnectionState:
-    # CORRECCION: Aumentados limites significativamente para evitar warnings constantes
     MAX_BUFFER_SIZE = 300
     THROTTLE_THRESHOLD = 250
     THROTTLE_DURATION_SECONDS = 2
@@ -123,9 +123,6 @@ class ConnectionState:
         self._backpressure.is_throttled = True
         self._backpressure.throttle_events += 1
         self._backpressure.last_throttle_at = now
-        self._backpressure.throttle_until = datetime.utcnow()
-        
-        from datetime import timedelta
         self._backpressure.throttle_until = now + timedelta(seconds=self.THROTTLE_DURATION_SECONDS)
         
         print(f"[BACKPRESSURE] [WARNING] Throttle activado para actividad: {self.activity_uuid}, buffer: {len(self._frame_buffer)}")
@@ -161,9 +158,10 @@ class ConnectionState:
         }
 
     async def send_personal_message(self, message: Dict, activity_uuid: str):
-        # Implementación básica para enviar mensaje por WS
         try:
-            await self.websocket.send_json(message)
+            text_message = json.dumps(message)
+            print(f"[CONNECTION_STATE] [DEBUG] Enviando mensaje con keys: {list(message.keys())}")
+            await self.websocket.send_text(text_message)
             return True
         except Exception as e:
             print(f"[CONNECTION_STATE] [ERROR] Error enviando mensaje WS: {e}")
@@ -251,6 +249,7 @@ class ConnectionManager:
     @property
     def connection_count(self) -> int:
         return len(self.active_connections)
+
 
 # Instancia global exportada
 manager = ConnectionManager()
