@@ -32,8 +32,8 @@ class SMTPClient:
                 port=self.port,
                 username=self.user,
                 password=self.password,
-                use_tls=True,  # Correcto para puerto 465
-                start_tls=False
+                use_tls=True,
+                start_tls=True
             )
             print(f"[SMTP] Correo enviado a {to_email}")
             return True
