@@ -33,7 +33,6 @@ class SMTPClient:
                 username=self.user,
                 password=self.password,
                 use_tls=True,
-                start_tls=True
             )
             print(f"[SMTP] Correo enviado a {to_email}")
             return True
