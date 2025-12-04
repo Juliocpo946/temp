@@ -17,7 +17,6 @@ class MonitoringPublisher:
         return cls._instance
 
     def publish(self, event: MonitoringEventDTO, correlation_id: Optional[str] = None) -> bool:
-        # Agregar activity_uuid al contexto para que el recommendation_service lo reciba
         contexto = event.contexto.copy() if event.contexto else {}
         contexto["activity_uuid"] = event.activity_uuid
         

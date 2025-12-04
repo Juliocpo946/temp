@@ -65,16 +65,10 @@ class RecommendationConsumer:
         try:
             message = json.loads(body)
             
-            # Intentar obtener el ID de conexión WS
             activity_uuid = message.get("contexto", {}).get("activity_uuid")
             
             if not activity_uuid:
-                # Fallback: a veces viene en metadata
                 activity_uuid = message.get("metadata", {}).get("activity_uuid")
-
-            print(f"[RECOMMENDATION_CONSUMER] [DEBUG] Mensaje recibido - activity_uuid: {activity_uuid}")
-            print(f"[RECOMMENDATION_CONSUMER] [DEBUG] Loop configurado: {self._loop is not None}")
-            print(f"[RECOMMENDATION_CONSUMER] [DEBUG] Conexiones activas: {list(manager.active_connections.keys())}")
 
             if not activity_uuid:
                 print(f"[RECOMMENDATION_CONSUMER] [WARNING] Mensaje sin activity_uuid, ignorando")
@@ -82,14 +76,9 @@ class RecommendationConsumer:
                 return
 
             has_conn = manager.has_connection(activity_uuid)
-            print(f"[RECOMMENDATION_CONSUMER] [DEBUG] has_connection({activity_uuid}): {has_conn}")
 
             if self._loop and has_conn:
-                print(f"[RECOMMENDATION_CONSUMER] [DEBUG] ANTES - tiene type?: {'type' in message}")
                 message["type"] = "recommendation"
-                print(f"[RECOMMENDATION_CONSUMER] [DEBUG] Keys del mensaje: {list(message.keys())}")
-                print(f"[RECOMMENDATION_CONSUMER] [DEBUG] DESPUES - type es: {message.get('type')}")
-                print(f"[RECOMMENDATION_CONSUMER] [DEBUG] Mensaje a enviar: {json.dumps(message)[:200]}")
                 
                 future = asyncio.run_coroutine_threadsafe(
                     manager.send_personal_message(message, activity_uuid),

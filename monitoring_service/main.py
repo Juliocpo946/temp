@@ -15,7 +15,6 @@ from src.infrastructure.config.settings import (
     MONITORING_WEBSOCKET_EVENTS_QUEUE
 )
 from src.infrastructure.persistence.database import create_tables, engine
-from src.infrastructure.messaging.rabbitmq_client import RabbitMQClient
 from src.infrastructure.messaging.recommendation_consumer import RecommendationConsumer
 from src.infrastructure.messaging.queue_validator import validate_service_queues
 from src.presentation.routes.health_routes import router as health_router
@@ -138,7 +137,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Monitoring Service",
-    version="2.0.0",
+    version="3.0.0",
     lifespan=lifespan
 )
 

@@ -4,7 +4,9 @@ from typing import Dict, Optional, List
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from fastapi import WebSocket
-from src.infrastructure.ml.sequence_buffer import SequenceBuffer
+from src.infrastructure.ml.feature_buffer import FeatureBuffer
+from src.infrastructure.ml.temporal_feature_extractor import TemporalFeatureExtractor
+from src.infrastructure.ml.cognitive_state_detector import CognitiveStateDetector
 from src.domain.services.intervention_controller import SessionContext
 from src.infrastructure.cache.redis_client import RedisClient
 
@@ -37,8 +39,12 @@ class ConnectionState:
         self.websocket = websocket
         self.session_id = session_id
         self.activity_uuid = activity_uuid
-        self.buffer = SequenceBuffer()
+        
+        self.feature_buffer = FeatureBuffer()
+        self.feature_extractor = TemporalFeatureExtractor()
+        self.state_detector = CognitiveStateDetector()
         self.context = SessionContext()
+        
         self.metadata: Optional[ActivityMetadata] = None
         self.is_ready = False
         self._redis_client: Optional[RedisClient] = None
@@ -160,7 +166,6 @@ class ConnectionState:
     async def send_personal_message(self, message: Dict, activity_uuid: str):
         try:
             text_message = json.dumps(message)
-            print(f"[CONNECTION_STATE] [DEBUG] Enviando mensaje con keys: {list(message.keys())}")
             await self.websocket.send_text(text_message)
             return True
         except Exception as e:
@@ -186,7 +191,7 @@ class ConnectionManager:
 
         self.redis_client.register_connection(session_id, activity_uuid)
 
-        print(f"[INFO] WebSocket conectado: actividad {activity_uuid} (sesion {session_id})")
+        print(f"[CONNECTION_MANAGER] [INFO] WebSocket conectado: actividad {activity_uuid} (sesion {session_id})")
         return state
 
     def disconnect(self, activity_uuid: str) -> Optional[ConnectionState]:
@@ -201,7 +206,7 @@ class ConnectionManager:
             self.redis_client.unregister_connection(state.session_id, activity_uuid)
 
             del self.active_connections[activity_uuid]
-            print(f"[INFO] WebSocket desconectado: actividad {activity_uuid}")
+            print(f"[CONNECTION_MANAGER] [INFO] WebSocket desconectado: actividad {activity_uuid}")
             return state
         return None
 
@@ -251,5 +256,4 @@ class ConnectionManager:
         return len(self.active_connections)
 
 
-# Instancia global exportada
 manager = ConnectionManager()

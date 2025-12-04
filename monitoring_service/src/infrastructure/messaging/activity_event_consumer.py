@@ -17,19 +17,19 @@ class ActivityStateManager:
     
     def set_paused(self, activity_uuid: str) -> None:
         self._activity_states[activity_uuid] = "pausada"
-        print(f"[INFO] Actividad {activity_uuid} marcada como pausada")
+        print(f"[ACTIVITY_STATE_MANAGER] [INFO] Actividad {activity_uuid} marcada como pausada")
     
     def set_active(self, activity_uuid: str) -> None:
         self._activity_states[activity_uuid] = "en_progreso"
-        print(f"[INFO] Actividad {activity_uuid} marcada como activa")
+        print(f"[ACTIVITY_STATE_MANAGER] [INFO] Actividad {activity_uuid} marcada como activa")
     
     def set_completed(self, activity_uuid: str) -> None:
         self._activity_states[activity_uuid] = "completada"
-        print(f"[INFO] Actividad {activity_uuid} marcada como completada")
+        print(f"[ACTIVITY_STATE_MANAGER] [INFO] Actividad {activity_uuid} marcada como completada")
     
     def set_abandoned(self, activity_uuid: str) -> None:
         self._activity_states[activity_uuid] = "abandonada"
-        print(f"[INFO] Actividad {activity_uuid} marcada como abandonada")
+        print(f"[ACTIVITY_STATE_MANAGER] [INFO] Actividad {activity_uuid} marcada como abandonada")
     
     def is_paused(self, activity_uuid: str) -> bool:
         return self._activity_states.get(activity_uuid) == "pausada"

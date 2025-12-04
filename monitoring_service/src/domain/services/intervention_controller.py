@@ -1,14 +1,13 @@
 from typing import Dict, Any, Optional
 from datetime import datetime, timedelta
-import json
 import numpy as np
 from src.domain.value_objects.intervention_type import InterventionType
 from src.infrastructure.config.settings import (
-    COOLDOWN_VIBRATION_SECONDS,
-    COOLDOWN_INSTRUCTION_SECONDS,
-    COOLDOWN_PAUSE_SECONDS
+    COOLDOWN_VIBRATION_BASE,
+    COOLDOWN_INSTRUCTION_BASE,
+    COOLDOWN_PAUSE_BASE,
+    COOLDOWN_EFFECTIVENESS_MULTIPLIER
 )
-
 
 class SessionContext:
     def __init__(self):
@@ -18,6 +17,9 @@ class SessionContext:
         self.vibration_count: int = 0
         self.instruction_count: int = 0
         self.pause_count: int = 0
+        self.vibration_effectiveness: float = 0.5
+        self.instruction_effectiveness: float = 0.5
+        self.pause_effectiveness: float = 0.5
         self.current_external_activity_id: Optional[int] = None
         self._session_id: Optional[str] = None
         self._activity_uuid: Optional[str] = None
@@ -38,6 +40,9 @@ class SessionContext:
                 self.vibration_count = data.get("vibration_count", 0)
                 self.instruction_count = data.get("instruction_count", 0)
                 self.pause_count = data.get("pause_count", 0)
+                self.vibration_effectiveness = data.get("vibration_effectiveness", 0.5)
+                self.instruction_effectiveness = data.get("instruction_effectiveness", 0.5)
+                self.pause_effectiveness = data.get("pause_effectiveness", 0.5)
                 self.current_external_activity_id = data.get("current_external_activity_id")
                 
                 if data.get("last_vibration_at"):
@@ -47,11 +52,11 @@ class SessionContext:
                 if data.get("last_pause_at"):
                     self.last_pause_at = datetime.fromisoformat(data["last_pause_at"])
                 
-                print(f"[SESSION_CONTEXT] [INFO] Estado de cooldown cargado desde Redis")
+                print(f"[SESSION_CONTEXT] [INFO] Estado cargado desde Redis")
                 return True
             return False
         except Exception as e:
-            print(f"[SESSION_CONTEXT] [ERROR] Error cargando cooldown desde Redis: {str(e)}")
+            print(f"[SESSION_CONTEXT] [ERROR] Error cargando desde Redis: {str(e)}")
             return False
 
     def save_to_redis(self) -> bool:
@@ -63,6 +68,9 @@ class SessionContext:
                 "vibration_count": self.vibration_count,
                 "instruction_count": self.instruction_count,
                 "pause_count": self.pause_count,
+                "vibration_effectiveness": self.vibration_effectiveness,
+                "instruction_effectiveness": self.instruction_effectiveness,
+                "pause_effectiveness": self.pause_effectiveness,
                 "current_external_activity_id": self.current_external_activity_id,
                 "last_vibration_at": self.last_vibration_at.isoformat() if self.last_vibration_at else None,
                 "last_instruction_at": self.last_instruction_at.isoformat() if self.last_instruction_at else None,
@@ -70,7 +78,7 @@ class SessionContext:
             }
             return self._redis_client.save_cooldown_state(self._session_id, self._activity_uuid, data)
         except Exception as e:
-            print(f"[SESSION_CONTEXT] [ERROR] Error guardando cooldown en Redis: {str(e)}")
+            print(f"[SESSION_CONTEXT] [ERROR] Error guardando en Redis: {str(e)}")
             return False
 
     def reset_for_activity(self, external_activity_id: int) -> None:
@@ -84,42 +92,20 @@ class SessionContext:
             self.last_pause_at = None
             self.save_to_redis()
 
-    def get_context_vector(self) -> np.ndarray:
-        now = datetime.utcnow()
-        max_time = 300.0
-        
-        time_since_vibration = max_time
-        if self.last_vibration_at:
-            time_since_vibration = min((now - self.last_vibration_at).total_seconds(), max_time)
-        
-        time_since_instruction = max_time
-        if self.last_instruction_at:
-            time_since_instruction = min((now - self.last_instruction_at).total_seconds(), max_time)
-        
-        time_since_pause = max_time
-        if self.last_pause_at:
-            time_since_pause = min((now - self.last_pause_at).total_seconds(), max_time)
-        
-        return np.array([
-            time_since_vibration / max_time,
-            time_since_instruction / max_time,
-            time_since_pause / max_time,
-            min(self.vibration_count / 10.0, 1.0),
-            min(self.instruction_count / 5.0, 1.0),
-            min(self.pause_count / 3.0, 1.0)
-        ], dtype=np.float32)
-
-    def get_snapshot(self) -> Dict[str, Any]:
+    def get_intervention_counts(self) -> Dict[str, int]:
         return {
-            "vibration_count": self.vibration_count,
-            "instruction_count": self.instruction_count,
-            "pause_count": self.pause_count,
-            "last_vibration_at": self.last_vibration_at.isoformat() if self.last_vibration_at else None,
-            "last_instruction_at": self.last_instruction_at.isoformat() if self.last_instruction_at else None,
-            "last_pause_at": self.last_pause_at.isoformat() if self.last_pause_at else None
+            "vibration": self.vibration_count,
+            "instruction": self.instruction_count,
+            "pause": self.pause_count
         }
 
-    # RENOMBRADO de register_intervention a record_intervention
+    def get_effectiveness_history(self) -> Dict[str, float]:
+        return {
+            "vibration": self.vibration_effectiveness,
+            "instruction": self.instruction_effectiveness,
+            "pause": self.pause_effectiveness
+        }
+
     def record_intervention(self, intervention_type: InterventionType) -> None:
         now = datetime.utcnow()
         if intervention_type == InterventionType.VIBRATION:
@@ -134,13 +120,23 @@ class SessionContext:
         
         self.save_to_redis()
 
+    def update_effectiveness(self, intervention_type: str, score: float) -> None:
+        if intervention_type == "vibration":
+            self.vibration_effectiveness = (self.vibration_effectiveness + score) / 2
+        elif intervention_type == "instruction":
+            self.instruction_effectiveness = (self.instruction_effectiveness + score) / 2
+        elif intervention_type == "pause":
+            self.pause_effectiveness = (self.pause_effectiveness + score) / 2
+        
+        self.save_to_redis()
+
 
 class InterventionController:
     def __init__(self):
-        self.cooldowns = {
-            InterventionType.VIBRATION: timedelta(seconds=COOLDOWN_VIBRATION_SECONDS),
-            InterventionType.INSTRUCTION: timedelta(seconds=COOLDOWN_INSTRUCTION_SECONDS),
-            InterventionType.PAUSE: timedelta(seconds=COOLDOWN_PAUSE_SECONDS)
+        self.base_cooldowns = {
+            InterventionType.VIBRATION: timedelta(seconds=COOLDOWN_VIBRATION_BASE),
+            InterventionType.INSTRUCTION: timedelta(seconds=COOLDOWN_INSTRUCTION_BASE),
+            InterventionType.PAUSE: timedelta(seconds=COOLDOWN_PAUSE_BASE)
         }
 
     def is_cooldown_active(
@@ -149,10 +145,8 @@ class InterventionController:
         context: SessionContext
     ) -> bool:
         now = datetime.utcnow()
-        cooldown = self.cooldowns.get(intervention_type)
         
-        if not cooldown:
-            return False
+        cooldown = self._calculate_adaptive_cooldown(intervention_type, context)
         
         last_time = None
         if intervention_type == InterventionType.VIBRATION:
@@ -166,6 +160,28 @@ class InterventionController:
             return False
         
         return (now - last_time) < cooldown
+
+    def _calculate_adaptive_cooldown(
+        self,
+        intervention_type: InterventionType,
+        context: SessionContext
+    ) -> timedelta:
+        base_cooldown = self.base_cooldowns.get(intervention_type)
+        if not base_cooldown:
+            return timedelta(seconds=30)
+        
+        effectiveness = 0.5
+        if intervention_type == InterventionType.VIBRATION:
+            effectiveness = context.vibration_effectiveness
+        elif intervention_type == InterventionType.INSTRUCTION:
+            effectiveness = context.instruction_effectiveness
+        elif intervention_type == InterventionType.PAUSE:
+            effectiveness = context.pause_effectiveness
+        
+        multiplier = 1.0 + (COOLDOWN_EFFECTIVENESS_MULTIPLIER * (1.0 - effectiveness))
+        
+        adaptive_seconds = int(base_cooldown.total_seconds() * multiplier)
+        return timedelta(seconds=adaptive_seconds)
 
     def can_intervene(
         self,

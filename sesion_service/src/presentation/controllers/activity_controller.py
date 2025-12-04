@@ -76,7 +76,8 @@ def get_activity(activity_uuid: str, db: Session = Depends(get_db)):
             'started_at': activity.started_at.isoformat(),
             'paused_at': activity.paused_at.isoformat() if activity.paused_at else None,
             'resumed_at': activity.resumed_at.isoformat() if activity.resumed_at else None,
-            'completed_at': activity.completed_at.isoformat() if activity.completed_at else None
+            'completed_at': activity.completed_at.isoformat() if activity.completed_at else None,
+            'pause_count': activity.pause_count
         }
     except HTTPException:
         raise

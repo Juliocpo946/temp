@@ -1,40 +1,29 @@
-# Entorno virtual
 venv/
 env/
 .venv/
 
-# Variables de entorno
 .env
 
-# Cache de Python
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 
-# Modelo entrenado
-models/*.keras
-models/*.h5
-
-# Datos de entrenamiento
-training/data/synthetic/*.npy
-training/data/production/*.npy
-training/data/production/*.json
-
-# IDE
 .idea/
 .vscode/
 *.swp
 *.swo
 
-# Logs
 *.log
 
-# Sistema
 .DS_Store
 Thumbs.db
 
-# Distribución
 dist/
 build/
 *.egg-info/
+
+*.keras
+*.h5
+*.npy
+*.json

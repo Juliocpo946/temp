@@ -16,3 +16,4 @@ class ActivityLogModel(Base):
     resumed_at = Column(DateTime, nullable=True)
     completed_at = Column(DateTime, nullable=True)
     feedback_data = Column(JSON, nullable=True)
+    pause_count = Column(Integer, default=0, nullable=False)

@@ -40,21 +40,6 @@ class QueueValidator:
         except Exception as e:
             return False, {"queue": queue_name, "error": str(e)}
 
-    def validate_queue_has_consumers(self, queue_name: str, min_consumers: int = 0) -> Tuple[bool, Dict[str, Any]]:
-        exists, info = self.validate_queue_exists(queue_name)
-        if not exists:
-            return False, info
-
-        consumer_count = info.get("consumer_count", 0)
-        has_consumers = consumer_count >= min_consumers
-
-        return has_consumers, {
-            "queue": queue_name,
-            "consumer_count": consumer_count,
-            "min_required": min_consumers,
-            "status": "ok" if has_consumers else "warning"
-        }
-
     def validate_queues(self, queue_configs: List[Dict[str, Any]]) -> Dict[str, Any]:
         results = {
             "all_exist": True,
@@ -83,11 +68,11 @@ class QueueValidator:
                 results["errors"].append(f"Cola no existe: {queue_name}")
                 queue_result["status"] = "error"
             elif require_consumers:
-                has_consumers, consumer_info = self.validate_queue_has_consumers(queue_name, min_consumers)
-                if not has_consumers:
+                consumer_count = info.get("consumer_count", 0)
+                if consumer_count < min_consumers:
                     results["all_have_consumers"] = False
                     results["warnings"].append(
-                        f"Cola {queue_name} tiene {consumer_info['consumer_count']} consumers (minimo requerido: {min_consumers})"
+                        f"Cola {queue_name} tiene {consumer_count} consumers (minimo requerido: {min_consumers})"
                     )
                     queue_result["status"] = "warning"
                 else:

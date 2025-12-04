@@ -1,18 +1,37 @@
 from enum import Enum
 
 class CognitiveState(Enum):
-    CONFUSED = 0
-    NEUTRAL = 1
-    UNDERSTANDING = 2
+    INITIALIZING = "initializing"
+    ENGAGED = "engaged"
+    LIGHT_DISTRACTION = "light_distraction"
+    HEAVY_DISTRACTION = "heavy_distraction"
+    CONFUSION = "confusion"
+    FRUSTRATION = "frustration"
+    COGNITIVE_OVERLOAD = "cognitive_overload"
+    FATIGUE = "fatigue"
     
     @classmethod
     def from_string(cls, state: str):
         mapping = {
-            "confundido": cls.CONFUSED,
-            "neutral": cls.NEUTRAL,
-            "entendiendo": cls.UNDERSTANDING
+            "initializing": cls.INITIALIZING,
+            "engaged": cls.ENGAGED,
+            "light_distraction": cls.LIGHT_DISTRACTION,
+            "heavy_distraction": cls.HEAVY_DISTRACTION,
+            "confusion": cls.CONFUSION,
+            "frustration": cls.FRUSTRATION,
+            "cognitive_overload": cls.COGNITIVE_OVERLOAD,
+            "fatigue": cls.FATIGUE
         }
-        return mapping.get(state.lower(), cls.NEUTRAL)
+        return mapping.get(state.lower(), cls.ENGAGED)
     
-    def to_float(self) -> float:
-        return float(self.value) / 2.0
+    def to_string(self) -> str:
+        return self.value
+    
+    def requires_intervention(self) -> bool:
+        return self in [
+            self.HEAVY_DISTRACTION,
+            self.CONFUSION,
+            self.FRUSTRATION,
+            self.COGNITIVE_OVERLOAD,
+            self.FATIGUE
+        ]

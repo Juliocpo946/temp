@@ -31,12 +31,13 @@ class PauseActivityUseCase:
             str(activity.session_id)
         )
 
-        self._publish_log(f"Actividad pausada: {activity_uuid}")
+        self._publish_log(f"Actividad pausada: {activity_uuid} (pausa #{activity.pause_count})")
 
         return {
             'status': 'pausada',
             'activity_uuid': activity_uuid,
-            'paused_at': activity.paused_at.isoformat()
+            'paused_at': activity.paused_at.isoformat(),
+            'pause_count': activity.pause_count
         }
 
     def _publish_log(self, message: str, level: str = "info") -> None:

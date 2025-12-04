@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 from src.infrastructure.config.settings import DATABASE_URL
 
@@ -16,11 +16,11 @@ def get_db():
 
 
 def create_tables():
-    # IMPORTANTE: Importar los modelos aquí para que se registren en Base.metadata
-    # antes de llamar a create_all
     import src.infrastructure.persistence.models.intervention_model
-    import src.infrastructure.persistence.models.training_sample_model
-    import src.infrastructure.persistence.models.state_transition_model
+    import src.infrastructure.persistence.models.cognitive_state_model
+    import src.infrastructure.persistence.models.detection_decision_model
+    import src.infrastructure.persistence.models.cluster_metadata_model
+    import src.infrastructure.persistence.models.user_profile_model
     
     Base.metadata.create_all(bind=engine)
     print(f"[DATABASE] [INFO] Tablas creadas exitosamente")

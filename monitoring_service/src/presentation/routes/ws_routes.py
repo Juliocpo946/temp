@@ -36,8 +36,8 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str, activity_uui
                 reason="client_disconnected"
             )
     except Exception as e:
-        print(f"[ERROR] Error en WebSocket {activity_uuid}: {e}")
-        print(f"[ERROR] Traceback completo:")
+        print(f"[WS_ROUTES] [ERROR] Error en WebSocket {activity_uuid}: {e}")
+        print(f"[WS_ROUTES] [ERROR] Traceback completo:")
         traceback.print_exc()
         disconnected_state = manager.disconnect(activity_uuid)
         if disconnected_state:

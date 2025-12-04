@@ -5,8 +5,10 @@ from sqlalchemy.orm import Session as DBSession
 from src.infrastructure.websocket.connection_manager import ConnectionState
 from src.infrastructure.messaging.rabbitmq_client import RabbitMQClient
 from src.application.use_cases.process_biometric_frame import ProcessBiometricFrameUseCase
-from src.application.use_cases.evaluate_intervention_result import EvaluateInterventionResultUseCase
+from src.application.use_cases.evaluate_intervention import EvaluateInterventionUseCase
 from src.application.dtos.biometric_frame_dto import BiometricFrameDTO
+from src.infrastructure.ml.temporal_feature_extractor import TemporalFeatureExtractor
+from src.infrastructure.ml.cognitive_state_detector import CognitiveStateDetector
 
 
 class FrameHandler:
@@ -77,7 +79,7 @@ class FrameHandler:
 
         state.set_metadata(user_id, external_activity_id, company_id)
 
-        print(f"[INFO] Handshake completado para actividad {state.activity_uuid}: user={user_id}, ext_activity={external_activity_id}")
+        print(f"[FRAME_HANDLER] [INFO] Handshake completado para actividad {state.activity_uuid}: user={user_id}, ext_activity={external_activity_id}")
 
         return {
             "type": "handshake_ack",
@@ -116,7 +118,9 @@ class FrameHandler:
 
         use_case = ProcessBiometricFrameUseCase(
             db=self.db,
-            buffer=state.buffer,
+            feature_buffer=state.feature_buffer,
+            feature_extractor=state.feature_extractor,
+            state_detector=state.state_detector,
             context=state.context,
             activity_uuid=state.activity_uuid,
             session_id=state.session_id,
@@ -126,8 +130,8 @@ class FrameHandler:
         )
         result = use_case.execute(frame)
 
-        evaluator = EvaluateInterventionResultUseCase(self.db, self.rabbitmq_client)
-        evaluator.execute(state.buffer, state.session_id, state.activity_uuid)
+        evaluator = EvaluateInterventionUseCase(self.db, self.rabbitmq_client)
+        evaluator.execute(state.feature_buffer, state.session_id, state.activity_uuid)
 
         if result:
             result["correlation_id"] = correlation_id

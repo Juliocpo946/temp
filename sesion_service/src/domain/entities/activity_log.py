@@ -14,7 +14,8 @@ class ActivityLog:
         paused_at: Optional[datetime],
         resumed_at: Optional[datetime],
         completed_at: Optional[datetime],
-        feedback_data: Optional[dict]
+        feedback_data: Optional[dict],
+        pause_count: int = 0  # NUEVO
     ):
         self.id = id or uuid.uuid4()
         self.activity_uuid = activity_uuid
@@ -26,10 +27,12 @@ class ActivityLog:
         self.resumed_at = resumed_at
         self.completed_at = completed_at
         self.feedback_data = feedback_data
+        self.pause_count = pause_count  # NUEVO
 
     def pause(self) -> None:
         self.status = "pausada"
         self.paused_at = datetime.utcnow()
+        self.pause_count += 1  # INCREMENTAR
 
     def resume(self) -> None:
         self.status = "en_progreso"

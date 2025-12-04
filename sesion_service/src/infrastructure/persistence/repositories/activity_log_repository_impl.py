@@ -15,7 +15,8 @@ class ActivityLogRepositoryImpl(ActivityLogRepository):
             session_id=activity_log.session_id,
             external_activity_id=activity_log.external_activity_id,
             status=activity_log.status,
-            feedback_data=activity_log.feedback_data
+            feedback_data=activity_log.feedback_data,
+            pause_count=activity_log.pause_count
         )
         self.db.add(db_activity)
         self.db.commit()
@@ -51,6 +52,7 @@ class ActivityLogRepositoryImpl(ActivityLogRepository):
             db_activity.resumed_at = activity_log.resumed_at
             db_activity.completed_at = activity_log.completed_at
             db_activity.feedback_data = activity_log.feedback_data
+            db_activity.pause_count = activity_log.pause_count
             self.db.commit()
             self.db.refresh(db_activity)
             return self._to_domain(db_activity)
@@ -68,5 +70,6 @@ class ActivityLogRepositoryImpl(ActivityLogRepository):
             paused_at=db_activity.paused_at,
             resumed_at=db_activity.resumed_at,
             completed_at=db_activity.completed_at,
-            feedback_data=db_activity.feedback_data
+            feedback_data=db_activity.feedback_data,
+            pause_count=db_activity.pause_count
         )

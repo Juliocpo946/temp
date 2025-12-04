@@ -28,9 +28,6 @@ class RabbitMQClient:
         if self.channel is None or self.channel.is_closed:
             self.channel = self.connection.channel()
 
-    def declare_queue(self, queue_name: str, with_dlq: bool = True) -> None:
-        pass
-
     def publish(
         self, 
         queue_name: str, 
@@ -71,7 +68,7 @@ class RabbitMQClient:
                     return False
         return False
 
-    def consume(self, queue_name: str, callback: Callable, with_dlq: bool = True) -> None:
+    def consume(self, queue_name: str, callback: Callable) -> None:
         try:
             self._ensure_connection()
             self.channel.basic_qos(prefetch_count=10)
@@ -85,11 +82,6 @@ class RabbitMQClient:
         except Exception as e:
             print(f"[RABBITMQ_CLIENT] [ERROR] Error consumiendo de RabbitMQ: {str(e)}")
             raise
-
-    def send_to_dlq(self, original_queue: str, message: Dict[str, Any], reason: str) -> bool:
-        dlq_name = f"{original_queue}_dlq"
-        message["dlq_reason"] = reason
-        return self.publish(dlq_name, message)
 
     def close(self) -> None:
         try:
